@@ -37,6 +37,27 @@ Here's a brief explanation of the RStudio interface:
 3. **Environment**: View your current variables and data
 4. **Files/Plots/Packages/Help**: Access files, view plots, manage packages, and get help
 
+In this course, we provide two types of files for you to use:
+
+1. **R files (.R)**: These are plain text files containing R code. They're ideal for writing and running scripts.
+2. **R Markdown files (.Rmd)**: These combine R code with formatted text, allowing you to create dynamic reports.
+   - To use: Open in RStudio, write text and R code in chunks, then 'Knit' to generate a formatted output (e.g., HTML, PDF).
+
+We recommend setting your working directory to the folder containing all the course materials. You can do this in two ways:
+
+1. Using the `setwd()` function in R:
+```{r, eval=FALSE}
+setwd("/path/to/your/course/folder")
+```
+   Replace "/path/to/your/course/folder" with the actual path to your downloaded course materials.
+
+2. Using RStudio's interface:
+   - Go to Session > Set Working Directory > Choose Directory
+   - Navigate to and select your course folder
+   - Click 'Open'
+
+Setting your working directory ensures that R can easily find and access all the files you'll be using throughout the course.
+
 ## Basic R Programming
 
 Let's start with some fundamental concepts in R programming:

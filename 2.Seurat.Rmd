@@ -65,7 +65,7 @@ Let's break down each step of this process:
 
    Imagine a three-dimensional space where each point represents a cell. Cells that are closer in this space have more similar characteristics, so we group nearby cells into the same cluster. While our brains can only visualize three dimensions, computers can work in higher dimensions. 
 
-   Using information from the top 10-20 PCs, algorithms help us find and group similar cells in this high-dimensional space. This process divides the cells into several clusters:
+   Using information from a selected number of top PCs (often ranging from 10 to 50, depending on the dataset), algorithms help us find and group similar cells in this high-dimensional space. The optimal number of PCs to use can vary based on the complexity and characteristics of your data.
 
 ![Unsupervised Clustering](images/unsupervised_clustering.png){width=300px}
 
@@ -73,7 +73,7 @@ Let's break down each step of this process:
 
    While the first PCA reduction allows us to distinguish some major groups using PC1 and PC2, more detailed grouping information might be contained in later PCs. To visualize this information in a two-dimensional plot, we need a second dimension reduction step. The most commonly used method for this is UMAP (Uniform Manifold Approximation and Projection).
 
-   UMAP compresses the 10-20 dimensional PC information into two dimensions, allowing us to visualize cell differences more intuitively. This step gives us x-y coordinate points for each cell:
+   UMAP compresses the multi-dimensional PC information (e.g. top 10-50 PCs, depending on the dataset) into two dimensions, allowing us to visualize cell differences more intuitively. The number of PCs used should be optimized for each dataset. This step gives us x-y coordinate points for each cell:
 
    ![UMAP Coordinates](images/umap_coordinates.png)
 
