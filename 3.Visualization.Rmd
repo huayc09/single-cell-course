@@ -424,14 +424,23 @@ ggplot2 is based on the Grammar of Graphics, a layered approach to creating visu
 
 ### Creating a Basic Plot from Seurat Data
 
-Let's start by creating a basic UMAP plot using ggplot2 instead of Seurat's built-in functions:
+Let's start by creating the most basic UMAP plot using ggplot2:
 
 ```{r, fig.width=6, fig.height=5}
 # Extract data from the Seurat object
 umap_data <- FetchData(pbmc, vars = c("umap_1", "umap_2", "cluster", "CD3D", "sample"))
 head(umap_data)
 
-# Create the plot
+# Create the most basic plot
+ggplot(umap_data, aes(x = umap_1, y = umap_2, color = CD3D)) +
+  geom_point()
+```
+
+This is the most basic plot we can create. It shows the UMAP coordinates of our cells, colored by CD3D expression. However, it's not very visually appealing or informative in its current state. Let's improve it step by step:
+
+```{r, fig.width=6, fig.height=5}
+# Create an improved plot
+library(viridis)
 ggplot(umap_data, aes(x = umap_1, y = umap_2, color = CD3D)) +
   geom_point(size = 0.5, alpha = 0.7) +
   scale_color_viridis() +
@@ -440,14 +449,14 @@ ggplot(umap_data, aes(x = umap_1, y = umap_2, color = CD3D)) +
        x = "UMAP_1", y = "UMAP_2")
 ```
 
-Let's break down this code:
+Let's break down the improvements we made:
 
-1. We use `FetchData()` to extract the UMAP coordinates, cluster information, and CD3D expression from our Seurat object.
-2. `ggplot()` initializes the plot with our data and aesthetic mappings.
-3. `geom_point()` adds a layer of points to represent our cells.
-4. `scale_color_viridis()` applies a continuous color scale.
-5. `theme_minimal()` applies a minimalistic theme.
-6. `labs()` adds labels to our plot.
+1. We adjusted the size and transparency of the points using `size = 0.5, alpha = 0.7` in `geom_point()`. This helps to visualize dense areas better.
+2. We used `scale_color_viridis()` to apply a colorblind-friendly, perceptually uniform color scale.
+3. We applied `theme_minimal()` to remove unnecessary plot elements and give it a cleaner look.
+4. We added a title and axis labels using `labs()`.
+
+These small changes significantly improve the readability and aesthetics of our plot. In the following sections, we'll explore even more ways to customize and enhance our visualizations.
 
 ### Customizing the Plot
 
@@ -511,6 +520,7 @@ plot_grid(title, combined_plot, ncol = 1, rel_heights = c(0.1, 1))
 Finally, let's save our plot using `ggsave()`:
 
 ```{r}
+dir.create("results", showWarnings = FALSE)
 ggsave("results/pbmc_umap_plot.png", combined_plot, width = 8, height = 4.5, dpi = 300)
 ```
 
@@ -519,6 +529,5 @@ This will save the plot as a high-resolution PNG file.
 ### Tips for Further Customization
 
 Remember, while ggplot2 offers extensive customization options, it can sometimes be complex. Don't hesitate to consult the ggplot2 documentation, online resources, or AI assistants like Claude or ChatGPT for help with specific customizations.
-
 
 This concludes our lesson on advanced visualization techniques. You now have a solid foundation in creating and customizing plots for your single-cell RNA-seq data analysis. In the next lesson, we'll explore more advanced analytical techniques to further your understanding of single-cell data.
