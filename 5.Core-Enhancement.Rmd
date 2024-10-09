@@ -1,0 +1,115 @@
+---
+title: "Lesson 5: Core scRNA-seq Workflow Enhancements"
+author: "Yichao Hua"
+date: "2024-10-11"
+output: html_document
+---
+
+## Introduction
+
+In Lesson 2, we explored the basic workflow of single-cell analysis using a small PBMC dataset. While this served as an excellent introduction to the field, it only scratched the surface of what's possible with single-cell RNA sequencing (scRNA-seq) analysis. In this lesson, we'll delve deeper into various aspects of the workflow, exploring more advanced techniques and considerations.
+
+We'll cover the following topics:
+
+1. Merging multiple datasets
+2. Detailed quality control (nGene, percent.mt)
+3. Doublet removal
+4. Data integration
+5. Cell-Cycle Scoring and Regression
+6. Alternative normalization methods (SCTransform)
+
+## 1. Merging Multiple Datasets
+
+In real-world scenarios, we often need to analyze multiple datasets together. This could be due to various reasons, such as comparing different conditions, time points, or even different technologies used on the same sample. 
+
+For this exercise, we'll use public datasets from the 10X Genomics website. These datasets are from the same sample but were processed using different technologies: the 3' kit and the 5' kit. These two approaches capture genes differently, which can lead to some variation in the results.
+
+First, let's load the necessary libraries and read in our data:
+
+```{r, message=FALSE, warning=FALSE}
+library(Seurat)
+library(SeuratExtend)
+
+# Load 3' dataset
+pbmc_3p <- Read10X("data/pbmc_ACDA/3p_ACDA/filtered_feature_bc_matrix/")
+pbmc_3p <- CreateSeuratObject(pbmc_3p, project = "pbmc_3p", min.features = 200, min.cells = 1)
+
+# Load 5' dataset
+pbmc_5p <- Read10X("data/pbmc_ACDA/5p_ACDA/filtered_feature_bc_matrix/")
+pbmc_5p <- CreateSeuratObject(pbmc_5p, project = "pbmc_5p", min.features = 200, min.cells = 1)
+
+# Merge the datasets
+pbmc_merge <- merge(pbmc_3p, pbmc_5p, add.cell.ids = c("pbmc_3p","pbmc_5p"))
+pbmc_merge <- JoinLayers(pbmc_merge)
+pbmc_merge
+```
+
+By merging these datasets, we can compare and analyze them together. The `add.cell.ids` parameter adds a prefix to cell names to distinguish their origin after merging.
+
+## 2. Detailed Quality Control (nGene, percent.mt)
+
+In our previous lesson, we used a basic quality control criterion: `min.features = 200`, which retains cells with more than 200 detected genes. However, this is quite a low threshold, chosen because the previous dataset had a low sequencing depth. In practice, these thresholds need to be adjusted based on the specific characteristics of your data.
+
+Let's start by examining the distribution of detected genes (nGene) in our merged dataset:
+
+```{r, fig.width=6, fig.height=5}
+VlnPlot2(pbmc_merge, features = "nFeature_RNA", group.by = "orig.ident")
+```
+
+We can observe that the 3' and 5' technologies detect different numbers of genes. This difference is due to the nature of these technologies:
+
+- 3' Technology: This approach sequences the 3' end of mRNA transcripts. It typically detects more genes and is more efficient, but it cannot perform TCR/BCR sequencing.
+- 5' Technology: This method sequences from the 5' end of mRNA transcripts. It allows for TCR/BCR sequencing, making it particularly useful when studying different lymphocyte clones.
+
+### Setting nGene Thresholds
+
+Cells with very low nGene are considered low quality and should be removed. The exact threshold depends on various factors including the sample type, cell type, and sequencing technology. Here are some general suggestions:
+
+- For 3' sequencing: Usually set above 1000
+- For 5' sequencing: Slightly lower, around 800-1000
+- For single nuclei sequencing: Even lower, typically 500-800
+
+However, these are just general references. It's crucial to examine the distribution in your data (using plots like the one above) to make an informed decision. For our current dataset, we'll use 1000 as the lower threshold.
+
+We also need to set an upper limit for nGene. While a higher nGene generally indicates better sequencing quality, extremely high values often represent anomalies such as doublets (two cells captured and sequenced as one). A common upper threshold is between 7500 and 8000 genes. 
+
+Note that this upper limit may need adjustment for certain technologies (e.g., Smart-seq2) that typically have higher sequencing depth, or for cell types (like fibroblasts or certain tumor cells) that naturally express more genes.
+
+### Mitochondrial Gene Percentage (percent.mt)
+
+Another important quality control metric is the percentage of mitochondrial genes (percent.mt). A high percentage of mitochondrial reads often indicates low-quality or dying cells. This is because as cells die, their cytoplasmic mRNA degrades, but mitochondrial RNA is more stable, leading to a higher proportion of mitochondrial reads.
+
+Let's calculate and visualize the percent.mt for our dataset:
+
+```{r}
+pbmc_merge[["percent.mt"]] <- PercentageFeatureSet(pbmc_merge, pattern = "^MT-")
+VlnPlot2(pbmc_merge, features = "percent.mt", group.by = "orig.ident")
+```
+
+In this code, `"^MT-"` indicates genes starting with "MT-" (for human data). For mouse data, you would use `"^mt-"`. 
+
+Typically, we set a threshold of percent.mt < 20%. For single nuclei data, which shouldn't contain mitochondria, a stricter threshold like percent.mt < 5% is often used.
+
+### Applying Quality Control Filters
+
+Now that we've discussed our quality control metrics, let's apply these filters to our data:
+
+```{r}
+# Before filtering
+print(paste("Before filtering:", ncol(pbmc_merge), "cells"))
+
+# Apply filters
+pbmc_merge <- subset(
+  pbmc_merge,
+  subset = nFeature_RNA > 1000 &
+    nFeature_RNA < 7500 &
+    percent.mt < 20
+)
+
+# After filtering
+print(paste("After filtering:", ncol(pbmc_merge), "cells"))
+```
+
+By applying these filters, we've removed low-quality cells and potential doublets from our dataset, providing a cleaner foundation for downstream analysis.
+
+In the next section, we'll explore more advanced techniques for improving our data quality and preparing for in-depth analysis.

@@ -1,0 +1,427 @@
+---
+title: "Lesson 4: Gene Set Enrichment Analysis and Utility Functions"
+author: "Yichao Hua"
+date: "2024-10-11"
+output: html_document
+---
+
+## Introduction to Gene Set Enrichment Analysis (GSEA)
+
+In our previous lessons, we primarily focused on gene-level analysis. However, it's often necessary to analyze data at the gene set level to gain broader biological insights. A common scenario involves examining the enrichment of gene sets from databases like Gene Ontology (GO) or from literature in different cell clusters within our data. This is where Gene Set Enrichment Analysis (GSEA) comes into play.
+
+Traditionally, functional enrichment analysis for bulk RNA-seq data involves identifying differentially expressed genes (DEGs) based on a predetermined cut-off and then comparing the resulting gene list against pathway databases to calculate enrichment scores. However, this approach has several limitations:
+
+1. It fails to capture the nuances of single-cell data.
+2. It relies on arbitrary cut-offs, potentially missing important biological signals.
+
+For single-cell analysis, we have specialized tools designed to calculate GSEA more accurately. In the `SeuratExtend` package, we use the AUCell method to compute pathway enrichment scores. This method calculates an enrichment score for each cell, allowing us to compare differences between clusters at the single-cell level.
+
+In this lesson, we'll cover:
+
+- GSEA calculation methods
+- Common gene set / pathway databases (GO, Reactome, Hallmark50, etc.)
+- How to use these databases in your analysis
+
+## Conducting GSEA using GO or Reactome Databases
+
+Before we dive into the analysis, let's briefly introduce two key databases we'll be using:
+
+1. **Gene Ontology (GO)**: GO is a major bioinformatics initiative to unify the representation of gene and gene product attributes across all species. It provides a controlled vocabulary of terms for describing gene product characteristics and gene product annotation data. The GO project classifies gene functions into three aspects:
+
+   - Biological Process (BP)
+   - Molecular Function (MF)
+   - Cellular Component (CC)
+
+   For more information, visit the official GO website: https://geneontology.org/
+
+2. **Reactome**: Reactome is an open-source, curated and peer-reviewed pathway database. It provides intuitive bioinformatics tools for the visualization, interpretation and analysis of pathway knowledge to support basic and clinical research, genome analysis, modeling, systems biology and education. You can explore Reactome's extensive resources at their official website: https://reactome.org/
+
+The `SeuratExtend` package integrates both the GO and Reactome databases, streamlining the GSEA analysis process. This is primarily facilitated through the `GeneSetAnalysisGO` and `GeneSetAnalysisReactome` functions, among other supplementary functions. In this section, we'll delve into the usage and features of these functions.
+
+### Setting Up the Environment
+
+First, let's load the necessary libraries and our previously saved PBMC object:
+
+```{r, message=FALSE, warning=FALSE}
+library(Seurat)
+library(SeuratExtend)
+library(dplyr)
+options(max.print = 15, spe = "human")
+
+# Load the PBMC object we saved at the end of Lesson 2
+pbmc <- readRDS("rds/pbmc_annotated.rds")
+```
+
+### Gene Ontology (GO) Database Analysis
+
+Performing GSEA using the GO database can be resource-intensive due to its extensive size. To make the analysis more feasible, you might consider evaluating pathways under specific categories. For instance, in the example below, we'll focus on pathways under the "immune_system_process" category.
+
+Note: When running `GeneSetAnalysisGO` for the first time, you may be prompted to install some required packages such as `DelayedArray`, `DelayedMatrixStats`, and `doMC` (for multi-threading computations). Simply confirm the installation of these packages when prompted.
+
+```{r, message=FALSE, warning=FALSE}
+pbmc <- GeneSetAnalysisGO(pbmc, parent = "immune_system_process", nCores = 4) # calculating with 4 cores
+matr <- pbmc@misc$AUCell$GO$immune_system_process
+matr <- RenameGO(matr, add_n_gene = FALSE) # Convert GO IDs to pathway names
+head(matr, c(5,3))
+```
+
+Note that the generated matrix is similar in structure to a gene count matrix, with cell names as column names. The key difference is that the row names now represent pathway names instead of gene names.
+
+For the "parent" argument in `GeneSetAnalysisGO()`, you can input any term from the GO database, be it a GO ID or a pathway name. To get a glimpse of commonly used GO categories, you can run `GeneSetAnalysisGO()` without any arguments:
+
+```{r, message=FALSE, warning=FALSE}
+GeneSetAnalysisGO()
+```
+
+### Visualizing GO GSEA Results
+
+There are several ways to visualize the results of our GSEA analysis. Here are some suggested methods:
+
+1. **Heatmap**: Useful for comparing multiple groups with numerous features but provides a less detailed representation.
+
+```{r, message=FALSE, warning=FALSE, fig.width=11.5, fig.height=7}
+toplot <- CalcStats(matr, f = pbmc$cluster, order = "p", n = 4)
+Heatmap(toplot, lab_fill = "zscore")
+```
+
+Note that we're using the `CalcStats` function here. In Lesson 3, we learned to use this function with a Seurat object as the first input parameter. However, `CalcStats` and some visualization functions like `VlnPlot2` and `WaterfallPlot` also support matrices as input, increasing flexibility. The main difference when using a matrix is that you need to provide an `f` parameter, which is a factor or vector indicating cell identity. Typically, this can be directly referenced from a column in the `meta.data`.
+
+2. **Violin Plot**: Best suited for comparing multiple groups with fewer features while presenting more details for individual data points.
+
+```{r, message=FALSE, warning=FALSE, fig.width=5, fig.height=6}
+VlnPlot2(matr[1:3,], f = pbmc$cluster, ncol = 1)
+```
+
+3. **Waterfall Plot**: Ideal for comparing two groups.
+
+```{r, message=FALSE, warning=FALSE, fig.width=10.5, fig.height=7}
+WaterfallPlot(matr, f = pbmc$cluster, ident.1 = "B cell", ident.2 = "CD8 T cell", top.n = 20)
+```
+
+### Reactome Database Analysis
+
+For GSEA using the Reactome database, we'll follow a similar process. Let's assess pathways under the "Immune System" category:
+
+```{r, message=FALSE, warning=FALSE, fig.width=10.5, fig.height=7}
+pbmc <- GeneSetAnalysisReactome(pbmc, parent = "Immune System")
+matr <- pbmc@misc$AUCell$Reactome$`Immune System`
+matr <- RenameReactome(matr)
+Heatmap(CalcStats(matr, f = pbmc$cluster, order = "p", n = 4), lab_fill = "zscore")
+```
+
+Similar to the GO database, running `GeneSetAnalysisReactome()` without any arguments lets you view commonly used categories in the Reactome database:
+
+```{r, message=FALSE, warning=FALSE}
+GeneSetAnalysisReactome()
+```
+
+## Perform GSEA using Customized Gene Sets
+
+While GO and Reactome databases provide comprehensive pathway information, sometimes researchers need to work with specific, customized gene sets. In this section, we'll explore how to perform GSEA using custom gene sets and access pre-defined gene set collections.
+
+### Using the Hallmark 50 Gene Set
+
+The [Hallmark 50](https://www.gsea-msigdb.org/gsea/msigdb/human/genesets.jsp?collection=H) gene set is commonly used for general screening. When using the `GeneSetAnalysis` function, the `genesets` parameter requires a list in a specific format. Each list item should be a gene set containing all the gene names in that set. For example, the structure of `hall50$human` looks like this:
+
+```{r}
+str(hall50$human, list.len = 10, max.level = 1)
+```
+
+Each list item is a character vector containing the gene names belonging to that gene set. Now, let's use this gene set for our analysis:
+
+```{r, message=FALSE, warning=FALSE, fig.width=7.5, fig.height=8}
+pbmc <- GeneSetAnalysis(pbmc, genesets = hall50$human)
+matr <- pbmc@misc$AUCell$genesets
+Heatmap(CalcStats(matr, f = pbmc$cluster), lab_fill = "zscore")
+```
+
+The resulting AUCell matrix is stored in `seu@misc$AUCell[[title]]`.
+
+### Exploring Additional Gene Sets
+
+The `SeuratExtendData::Genesets_data` object offers an extensive collection of gene sets from the [GSEA MSigDB website](https://www.gsea-msigdb.org/gsea/msigdb/human/collections.jsp). You can view available collections:
+
+```{r, message=FALSE, warning=FALSE}
+names(Genesets_data$human$GSEA)
+```
+
+For cell type annotations, `PanglaoDB_data` provides marker lists for 178 distinct cell types from [PanglaoDB](https://panglaodb.se/markers.html):
+
+```{r, message=FALSE, warning=FALSE}
+names(PanglaoDB_data$marker_list_human)
+```
+
+## Converting Pathway IDs to Names
+
+Pathway IDs can be cryptic. The `RenameGO` and `RenameReactome` functions help convert these IDs to more descriptive names:
+
+```{r, message=FALSE, warning=FALSE}
+# Convert GO IDs
+RenameGO(c("GO:0002376","GO:0050896"), spe = "human")
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Convert Reactome IDs
+RenameReactome(c("R-HSA-109582","R-HSA-112316"), spe = "human")
+```
+
+## Filtering Pathway Lists
+
+To focus on relevant pathways, use `FilterGOTerms` and `FilterReactomeTerms`:
+
+### Filtering GO Pathways
+
+```{r, message=FALSE, warning=FALSE}
+# By parent term
+terms <- FilterGOTerms(parent = "GO:0002376") # immune system process (3213g)
+RenameGO(terms)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# By gene count
+terms2 <- FilterGOTerms(term = terms, n.min = 10, n.max = 100)
+RenameGO(terms2)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# End-level pathways
+terms3 <- FilterGOTerms(term = terms, only.end.terms = TRUE)
+RenameGO(terms3)
+```
+
+### Filtering Reactome Pathways
+
+```{r, message=FALSE, warning=FALSE}
+terms <- FilterReactomeTerms(parent = "R-HSA-168256")
+RenameReactome(terms)
+```
+
+## Finding Pathways in Databases
+
+Navigating large databases like GO and Reactome can be challenging. The `SearchDatabase` function simplifies this process with various search parameters.
+
+### General Search
+
+You can search by gene name, pathway ID, or keywords:
+
+```{r, message=FALSE, warning=FALSE}
+# Search for pathways that either contain the gene CD3D in their gene list,
+# or have 'metabolic' in their pathway name
+result <- SearchDatabase(c("CD3D", "metabolic"))
+names(result)
+```
+
+```{r, message=FALSE, warning=FALSE}
+glimpse(head(result))
+```
+
+### Species-Specific Search
+
+Specify 'human' or 'mouse' using the 'spe' parameter:
+
+```{r, message=FALSE, warning=FALSE}
+result <- SearchDatabase("antigen pr", spe = "mouse") # Pathways related to antigen presentation
+names(result)
+```
+
+```{r, message=FALSE, warning=FALSE}
+glimpse(head(result))
+```
+
+### Customizing Return Types
+
+The `SearchDatabase` function offers various return types to suit different analytical needs:
+
+1. When `return = "ID"`, the function returns matching pathway IDs. These IDs can be directly used with `FilterGOTerms` and `FilterReactomeTerms` functions for further filtering and analysis.
+
+```{r, message=FALSE, warning=FALSE}
+# Return pathway IDs
+result <- SearchDatabase("metabolic", return = "ID")
+result
+```
+
+2. When `return = "genelist"`, the function returns a list of genes formatted to match the input required by the `GeneSetAnalysis` function. This allows you to directly use the search results for enrichment analysis of specific pathways, without needing to call `GeneSetAnalysisGO` or `GeneSetAnalysisReactome` (which are typically used for more general screening).
+
+```{r, message=FALSE, warning=FALSE}
+# Return as a gene list for GeneSetAnalysis
+result <- SearchDatabase("metabolic", return = "genelist")
+str(result, list.len = 10, max.level = 1)
+```
+
+This flexibility enables you to choose the most appropriate output format based on your specific needs, thereby streamlining subsequent analysis steps.
+
+## Creating GSEA Plots
+
+The `GSEAplot` function generates visualizations similar to those from the Broad Institute's GSEA:
+
+```{r, message=FALSE, warning=FALSE, fig.width=5.5, fig.height=4.5}
+GSEAplot(
+  pbmc, 
+  ident.1 = "CD4 T Naive", 
+  title = "INTERFERON_GAMMA_RESPONSE",
+  geneset = hall50$human$HALLMARK_INTERFERON_GAMMA_RESPONSE
+)
+```
+
+This plot shows the negative enrichment of the "INTERFERON_GAMMA_RESPONSE" gene set in the "CD4 T Naive" cell population compared to non-CD4 T Naive cells. The negative Enrichment Score and the downward trend of the enrichment plot indicate that this pathway is downregulated in CD4 T Naive cells. The highly significant p-value suggests that this downregulation is statistically meaningful.
+
+## Utility Functions for Gene Analysis
+
+In addition to GSEA, there are several utility functions in `SeuratExtend` that can greatly facilitate your scRNA-seq analysis. Let's explore some of these useful tools.
+
+### Gene Naming Conversions
+
+Gene naming conventions often vary between organisms and databases. `SeuratExtend` provides functions to convert between human and mouse gene symbols, as well as Ensembl IDs. These functions use a localized version of the `biomaRt` database, improving reliability and performance.
+
+#### Available Conversion Functions:
+
+- `HumanToMouseGenesymbol`
+- `MouseToHumanGenesymbol`
+- `EnsemblToGenesymbol`
+- `GenesymbolToEnsembl`
+
+These functions share a similar usage pattern, as detailed below using `HumanToMouseGenesymbol` as an example.
+
+#### Getting Started with Examples
+
+First, let's retrieve a few human gene symbols from a dataset as an example:
+
+```{r}
+human_genes <- VariableFeatures(pbmc)[1:6]
+print(human_genes)
+```
+
+#### Default Usage
+
+By default, `HumanToMouseGenesymbol` returns a data frame showing how human gene symbols (HGNC) match with mouse gene symbols (MGI):
+
+```{r}
+HumanToMouseGenesymbol(human_genes)
+```
+
+This table indicates that not all human genes have direct mouse homologs, and some human genes may correspond to multiple mouse genes.
+
+#### Simplified Output
+
+If you prefer a simpler vector output without the matching details:
+
+```{r}
+HumanToMouseGenesymbol(human_genes, match = FALSE)
+```
+
+#### Converting Gene Expression Matrices
+
+These functions can also directly convert human gene expression matrices to their mouse counterparts:
+
+```{r}
+# Create an example gene expression matrix
+human_matr <- GetAssayData(pbmc)[human_genes, 1:4]
+print(human_matr)
+
+# Convert to a mouse gene expression matrix
+HumanToMouseGenesymbol(human_matr)
+```
+
+#### Other Gene Naming Conversion Functions
+
+The usage patterns for the other conversion functions in `SeuratExtend`, such as `MouseToHumanGenesymbol`, `GenesymbolToEnsembl`, and `EnsemblToGenesymbol`, are similar to those already discussed. These functions also leverage local databases to enhance performance and reliability but provide options to use online databases via `biomaRt` if necessary.
+
+Here are some examples demonstrating the use of other gene naming conversion functions:
+
+```{r}
+# Converting mouse gene symbols to human
+mouse_genes <- c("Cd14", "Cd3d", "Cd79a")
+MouseToHumanGenesymbol(mouse_genes, match = FALSE)
+```
+
+```{r}
+# Converting human gene symbols to Ensembl IDs
+human_genes <- c("PPBP", "LYZ", "S100A9", "IGLL5", "GNLY", "FTL")
+GenesymbolToEnsembl(human_genes, spe = "human", keep.seq = TRUE)
+```
+
+```{r}
+# Converting mouse gene symbols to Ensembl IDs
+GenesymbolToEnsembl(mouse_genes, spe = "mouse", keep.seq = TRUE)
+```
+
+```{r}
+# Converting Ensembl IDs to human gene symbols
+EnsemblToGenesymbol(c("ENSG00000163736", "ENSG00000090382"), spe = "human", keep.seq = TRUE)
+```
+
+```{r}
+# Converting Ensembl IDs to mouse gene symbols
+EnsemblToGenesymbol(c("ENSMUSG00000051439", "ENSMUSG00000032094"), spe = "mouse", keep.seq = TRUE)
+```
+
+## Assess Proportion of Positive Cells in Clusters {#assess-proportion-of-positive-cells-in-clusters}
+
+This section describes how to utilize the `feature_percent` function in the `SeuratExtend` package to determine the proportion of positive cells within specified clusters or groups based on defined criteria. This function is particularly useful for identifying the expression levels of genes or other features within subpopulations of cells in scRNA-seq datasets.
+
+### Basic Usage
+
+To calculate the proportion of positive cells for the top 10 variable features in a Seurat object:
+
+```{r}
+options(max.print = 50)
+
+genes <- VariableFeatures(pbmc)[1:10]
+
+# Default usage
+proportions <- feature_percent(pbmc, feature = genes)
+print(proportions)
+```
+
+```{r, fig.width=5, fig.height=3.2, message=FALSE, warning=FALSE}
+library(RColorBrewer)
+Heatmap(proportions, lab_fill = "Proportion of\npositive cell", color_scheme = brewer.pal(5, "OrRd"))
+```
+
+This will return a matrix where rows are features and columns are clusters, showing the proportion of cells in each cluster where the feature's expression is above the default threshold (0).
+
+### Adjusting the Expression Threshold
+
+To count a cell as positive only if its expression is above a value of 2:
+
+```{r}
+proportions_above_2 <- feature_percent(pbmc, feature = genes, above = 2)
+print(proportions_above_2)
+```
+
+```{r, fig.width=5.4, fig.height=3.2, message=FALSE, warning=FALSE}
+Heatmap(proportions_above_2, lab_fill = "Proportion of\nexpression > 2", color_scheme = brewer.pal(5, "OrRd"))
+```
+
+### Targeting Specific Clusters
+
+To calculate proportions for only a subset of clusters:
+
+```{r}
+proportions_subset <- feature_percent(pbmc, feature = genes, ident = c("B cell", "CD8 T cell"))
+print(proportions_subset)
+```
+
+### Proportions Relative to Total Cell Numbers
+
+To also check the proportion of expressed cells in total across selected clusters:
+
+```{r}
+proportions_total <- feature_percent(pbmc, feature = genes, total = TRUE)
+print(proportions_total)
+```
+
+### Logical Output for Expression
+
+For scenarios where you need a logical output indicating whether a significant proportion of cells are expressing the feature above a certain level (e.g., 20%):
+
+```{r}
+expressed_logical <- feature_percent(pbmc, feature = genes, if.expressed = TRUE, min.pct = 0.2)
+print(expressed_logical)
+```
+
+## Conclusion
+
+In this lesson, we've delved deep into Gene Set Enrichment Analysis (GSEA) and its application in single-cell RNA sequencing data analysis. We've learned how to perform GSEA using GO and Reactome databases, how to handle custom gene sets, and how to leverage various utility functions to enhance the flexibility and depth of our analysis.
+
+These skills will enable you to gain deeper insights into the biological significance revealed by single-cell data, helping you uncover new insights and hypotheses in your research. In the upcoming lessons, we will continue to explore more advanced analytical techniques, further expanding your capabilities in single-cell data analysis.
