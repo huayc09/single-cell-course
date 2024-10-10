@@ -40,7 +40,7 @@ pbmc_5p <- CreateSeuratObject(pbmc_5p, project = "pbmc_5p", min.features = 200, 
 
 # Merge the datasets
 pbmc_merge <- merge(pbmc_3p, pbmc_5p, add.cell.ids = c("pbmc_3p","pbmc_5p"))
-pbmc_merge <- JoinLayers(pbmc_merge)
+pbmc_merge <- JoinLayers(pbmc_merge) # This step is required for Seurat v5
 pbmc_merge
 ```
 
@@ -52,7 +52,7 @@ In our previous lesson, we used a basic quality control criterion: `min.features
 
 Let's start by examining the distribution of detected genes (nGene) in our merged dataset:
 
-```{r, fig.width=6, fig.height=5}
+```{r, fig.width=6, fig.height=5, message=FALSE, warning=FALSE}
 VlnPlot2(pbmc_merge, features = "nFeature_RNA", group.by = "orig.ident")
 ```
 
@@ -81,7 +81,7 @@ Another important quality control metric is the percentage of mitochondrial gene
 
 Let's calculate and visualize the percent.mt for our dataset:
 
-```{r}
+```{r, fig.width=6, fig.height=5, message=FALSE, warning=FALSE}
 pbmc_merge[["percent.mt"]] <- PercentageFeatureSet(pbmc_merge, pattern = "^MT-")
 VlnPlot2(pbmc_merge, features = "percent.mt", group.by = "orig.ident")
 ```
@@ -112,4 +112,406 @@ print(paste("After filtering:", ncol(pbmc_merge), "cells"))
 
 By applying these filters, we've removed low-quality cells and potential doublets from our dataset, providing a cleaner foundation for downstream analysis.
 
-In the next section, we'll explore more advanced techniques for improving our data quality and preparing for in-depth analysis.
+## 3. Doublet Removal
+
+In our previous section, we used a simple upper limit on nGene to remove potential doublets. However, this method is relatively crude. More sophisticated algorithms have been developed to identify and remove doublets with greater precision. One such tool is `scDblFinder`.
+
+`scDblFinder` is a machine learning-based tool that identifies doublets in single-cell RNA sequencing data. It works by simulating artificial doublets from the existing data and then using these simulations to train a model that can distinguish real cells from doublets based on their gene expression profiles.
+
+Before we begin, let's ensure we have the necessary packages installed:
+
+```{r, eval=FALSE, message=FALSE, warning=FALSE}
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+if (!require("scDblFinder", quietly = TRUE))
+  BiocManager::install("scDblFinder")
+```
+
+Here's how we can use `scDblFinder` in our analysis:
+
+```{r, message=FALSE, warning=FALSE}
+library(scDblFinder)
+
+# Convert Seurat object to SingleCellExperiment
+sce <- as.SingleCellExperiment(pbmc_merge)
+
+# Run scDblFinder
+sce <- scDblFinder(sce, samples = "orig.ident")
+
+# Add scDblFinder results to our Seurat object
+pbmc_merge$scDblFinder.class <- sce$scDblFinder.class
+
+# View doublet predictions
+table(pbmc_merge$scDblFinder.class)
+
+# Remove predicted doublets
+pbmc_merge <- subset(pbmc_merge, subset = scDblFinder.class == "singlet")
+
+# Check the number of cells after doublet removal
+print(paste("After doublet removal:", ncol(pbmc_merge), "cells"))
+```
+
+For most standard single-cell RNA-seq analyses, using `scDblFinder` for doublet removal is a recommended practice that will improve your data quality. However, it's important to keep in mind that like any computational method, it's not 100% accurate. There are a few considerations to keep in mind:
+
+1. False positives: Some cell types might be mistakenly identified as doublets. For example:
+   - Proliferating cells, which naturally have higher RNA content
+   - Rare cell types (like plasmacytoid dendritic cells, or pDCs) that may have unique gene expression profiles
+
+2. Biological relevance: In some cases, what appears computationally as a "doublet" might be a biologically relevant state, such as cell-cell interactions or cells undergoing cell fusion.
+
+3. Dataset specificity: The accuracy of doublet detection can vary depending on the characteristics of your dataset, including the cell types present and the sequencing technology used.
+
+If you're particularly interested in cell types that might be at risk of being misclassified as doublets, it's advisable to carefully review the results before removing cells. You might consider:
+
+- Checking which cell types are disproportionately classified as doublets
+- Comparing the gene expression profiles of cells classified as doublets vs. singlets
+
+Remember, the goal of doublet removal is to improve data quality, but it shouldn't come at the cost of losing biologically relevant information. Always interpret the results in the context of your biological question and experimental design.
+
+## 4. Data Integration
+
+Now that we've performed quality control and doublet removal, let's proceed with the traditional Seurat workflow on our merged PBMC dataset:
+
+```{r, message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+pbmc_merge <- NormalizeData(pbmc_merge)
+pbmc_merge <- FindVariableFeatures(pbmc_merge)
+pbmc_merge <- ScaleData(pbmc_merge)
+pbmc_merge <- RunPCA(pbmc_merge)
+pbmc_merge <- RunUMAP(pbmc_merge, dims = 1:10)
+pbmc_merge <- FindNeighbors(pbmc_merge, dims = 1:10)
+pbmc_merge <- FindClusters(pbmc_merge, resolution = 0.5)
+
+DimPlot2(pbmc_merge, features = c("seurat_clusters", "orig.ident", "CD3D", "CD14"), theme = NoAxes())
+```
+
+Upon examining the results, we notice that the clustering is significantly influenced by the different techniques used (3' vs 5' sequencing). This effect is known as batch effect. Ideally, we want our clustering to reflect the genuine cell type differences across all samples, rather than technical differences between batches.
+
+To address this issue, we can use a method called Harmony for batch effect removal (or data integration). Harmony is an algorithm that adjusts for batch effects in single-cell data while preserving biological variation.
+
+The principle behind Harmony is relatively straightforward: After running PCA, some principal components (PCs) reflect differences between cell clusters, while others represent differences between samples or batches. Harmony corrects for this by removing the PCs associated with batch differences while retaining those that represent genuine biological variation between cell types. This way, when we subsequently run UMAP and find clusters, the results will be based primarily on cell type differences rather than batch effects.
+
+Let's see how to implement Harmony:
+
+First, if you haven't installed Harmony, you can do so with the following code:
+
+```{r, eval=FALSE}
+if (!require("harmony", quietly = TRUE))
+    install.packages("harmony")
+```
+
+Now, let's run Harmony (note that all steps up to and including RunPCA remain the same as before):
+
+```{r, warning=FALSE}
+library(harmony)
+pbmc_merge <- RunHarmony(pbmc_merge, group.by.vars = "orig.ident")
+```
+
+After running Harmony, we proceed with the usual workflow, but now using the Harmony-corrected dimensions:
+
+```{r, message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+pbmc_merge <- RunUMAP(pbmc_merge, dims = 1:10, reduction = "harmony")
+pbmc_merge <- FindNeighbors(pbmc_merge, dims = 1:10, reduction = "harmony")
+pbmc_merge <- FindClusters(pbmc_merge, resolution = 0.5)
+
+DimPlot2(pbmc_merge, features = c("seurat_clusters", "orig.ident", "CD3D", "CD14"), theme = NoAxes())
+```
+
+Now we can see that the clustering is based on cell types, and the differences between the two samples (3' and 5' sequencing) have been largely eliminated.
+
+To better understand what Harmony has done, let's compare the outputs of PCA and Harmony:
+
+```{r}
+head(Embeddings(pbmc_merge, reduction = "pca"), 3)
+```
+
+```{r}
+head(Embeddings(pbmc_merge, reduction = "harmony"), 3)
+```
+
+You'll notice that they have the same shape. This is because Harmony essentially corrects the original PC matrix. To visualize this correction more clearly, let's use Violin Plots to compare the first few PCA and Harmony dimensions:
+
+```{r, fig.width=9, fig.height=7.5}
+VlnPlot2(pbmc_merge, features = paste0("PC_", 1:9), group.by = "orig.ident")
+```
+
+```{r, fig.width=9, fig.height=7.5}
+VlnPlot2(pbmc_merge, features = paste0("harmony_", 1:9), group.by = "orig.ident")
+```
+
+As we can see, the PCs that were previously correlated with the `orig.ident` (i.e., showed clear differences between 3' and 5' samples) have been corrected. The Harmony-corrected PCs now primarily retain information about differences between cell types, rather than differences between sequencing techniques.
+
+This integration step is crucial when working with multiple datasets or batches, as it allows us to focus on the biological differences of interest rather than technical variations between samples or batches. However, it's important to use this technique judiciously and always consider whether the differences between your samples might be biologically relevant rather than just technical noise.
+
+## 5. Cell-Cycle Scoring and Regression
+
+When cells are in a state of division, they highly express cell cycle-related genes. These genes have such a strong signal that in unsupervised clustering, highly proliferating cells often form their own cluster, regardless of their original cell type. For example, in lymphocyte analysis, unsupervised clustering might identify various CD8, CD4 subgroups and NK cells, along with a cluster of mitotic cells. While this is often acceptable, there might be cases where you're particularly interested in understanding which cell types these mitotic cells originally belonged to. In such situations, we need methods to mitigate the confounding effects of cell cycle genes.
+
+This part of our tutorial is based on the Seurat vignette on cell cycle analysis:
+https://satijalab.org/seurat/articles/cell_cycle_vignette
+
+Let's start by calculating cell cycle scores:
+
+```{r, message=FALSE, warning=FALSE}
+# Load cell cycle genes
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+# Calculate cell cycle scores
+pbmc_merge <- CellCycleScoring(pbmc_merge, s.features = s.genes, g2m.features = g2m.genes)
+
+# View the results
+head(pbmc_merge@meta.data)
+```
+
+After running `CellCycleScoring`, you'll notice three new columns in the `meta.data`: 
+- `S.Score`: The score for S phase
+- `G2M.Score`: The score for G2/M phase
+- `Phase`: The determined cell cycle phase for each cell
+
+Once we've calculated these scores, we can regress out their effects during the data scaling step:
+
+```{r, eval=FALSE}
+pbmc_merge <- ScaleData(pbmc_merge, vars.to.regress = c("S.Score", "G2M.Score"))
+```
+
+The rest of the workflow remains unchanged (i.e., you would proceed with `RunPCA` and subsequent steps as before).
+
+Similarly, you can also regress out other confounding factors, such as the percentage of mitochondrial genes:
+
+```{r, eval=FALSE}
+pbmc_merge <- ScaleData(pbmc_merge, vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"))
+```
+
+It's important to note that while we're introducing this concept in class, we won't be running these steps in our current analysis. The reason for introducing Cell-Cycle Regression is that some tutorials recommend doing this routinely. However, based on personal experience, this regression isn't always effective, and whether to perform this step depends on your specific research goals.
+
+Here are some considerations when deciding whether to perform cell cycle regression:
+
+1. Research Question: If your research focuses on cell cycle-related processes or if you're studying tissues with varying proliferation rates, you might want to retain this information rather than regress it out.
+
+2. Biological Relevance: In some cases, the cell cycle state might be biologically relevant to your study. For instance, if you're studying a developmental process or cancer, differences in proliferation rates between cell types or conditions could be important.
+
+3. Effect on Other Genes: Regressing out cell cycle effects can sometimes impact the expression patterns of other genes, potentially obscuring other biological signals of interest.
+
+4. Visualization: Sometimes, having a distinct cluster of mitotic cells can be informative and acceptable in your analysis, providing a quick visual cue about proliferating cells in your sample.
+
+5. Downstream Analysis: Consider how cell cycle regression might affect any downstream analyses you plan to perform, such as trajectory inference or differential expression analysis.
+
+In my personal opinion, retaining a cluster of mitotic cells in your cell clustering results is often acceptable and can be informative. However, the decision to regress out cell cycle effects should be made based on your specific research questions and the nature of your biological system.
+
+If you do decide to perform cell cycle regression, it's a good practice to compare your results before and after regression to understand how it's affecting your data. This can help you make an informed decision about whether to include this step in your final analysis pipeline.
+
+## 6. Alternative Normalization Methods (SCTransform)
+
+So far, we've been using the `NormalizeData` function for data normalization. However, Seurat offers an alternative normalization method called `SCTransform` (for more details, see https://satijalab.org/seurat/articles/sctransform_vignette). 
+
+`SCTransform` is a powerful normalization method that aims to remove technical artifacts (e.g. Sequencing depth variations, Dropout events) from scRNA-seq data while preserving biological heterogeneity. It uses a regularized negative binomial regression model to normalize and transform the data, accounting for sequencing depth and other technical factors.
+
+If you decide to use SCTransform, it replaces the combination of `NormalizeData`, `FindVariableFeatures`, and `ScaleData` steps in the traditional Seurat workflow. The rest of the workflow remains largely unchanged. Here's an example of how to implement SCTransform:
+
+```{r, message=FALSE, warning=FALSE, fig.width=9, fig.height=6}
+if (!requireNamespace("glmGamPoi", quietly = TRUE)) 
+    BiocManager::install("glmGamPoi")
+options(future.globals.maxSize = 1000 * 1024^2)  # Increase to 1000 MiB
+
+# Assuming pbmc_merge has been filtered for nGene and percent.mt, but not yet normalized
+
+pbmc_merge <- SCTransform(pbmc_merge)
+pbmc_merge <- RunPCA(pbmc_merge)
+pbmc_merge <- RunHarmony(pbmc_merge, group.by.vars = "orig.ident", theta = 5) # Increase theta for stronger batch correction between 3' and 5' data
+pbmc_merge <- RunUMAP(pbmc_merge, dims = 1:20, reduction = "harmony") # SCTransform often benefits from using more dimensions
+pbmc_merge <- FindNeighbors(pbmc_merge, dims = 1:20, reduction = "harmony")
+pbmc_merge <- FindClusters(pbmc_merge, resolution = 0.5)
+
+DimPlot2(pbmc_merge, features = c("seurat_clusters", "orig.ident", "CD3D", "CD14"), theme = NoAxes())
+```
+
+Both SCTransform and traditional normalization methods are widely accepted in the scRNA-seq analysis community. The authors of SCTransform argue that their method more effectively recovers true gene expression patterns and results in more refined clustering. However, there are some considerations to keep in mind:
+
+1. Computational Resources: SCTransform typically requires more computational resources and storage space, especially for larger datasets.
+
+2. Complex Microenvironments: For data from complex microenvironments (such as tumors), SCTransform may not always outperform traditional normalization methods.
+
+3. Interpretability: The output of SCTransform can sometimes be less intuitive to interpret compared to traditional normalization methods.
+
+4. Compatibility: Some downstream analysis tools might be optimized for traditionally normalized data, so it's worth checking compatibility if you plan to use specialized analysis methods.
+
+In my personal practice, I often run both methods and compare the results, choosing the one that provides clearer clustering, more distinct biological signatures, or better alignment with expected cell type distributions. This comparison can be particularly useful when working with a new dataset or biological system.
+
+Here are some tips for comparing SCTransform with traditional normalization:
+
+1. Visual Comparison: Compare UMAP plots from both methods. Look for clearer separation between cell types and more distinct clustering.
+
+2. Marker Gene Expression: Check the expression patterns of known marker genes. The method that shows clearer and more biologically sensible patterns might be preferable.
+
+3. Differential Expression Analysis: Perform differential expression analysis between clusters using both methods. Compare the results for biological relevance and consistency with prior knowledge.
+
+4. Batch Effect Correction: If you're working with multiple batches, compare how well each method handles batch effects.
+
+5. Rare Cell Types: Pay attention to whether rare cell populations are better preserved or more clearly defined in one method versus the other.
+
+Remember, the choice between SCTransform and traditional normalization should be based on your specific dataset, research questions, and computational resources. It's always a good idea to critically evaluate the results and ensure they align with biological expectations and prior knowledge about your system.
+
+## 7. Complete Workflow Summary
+
+To conclude this lesson, let's provide a comprehensive code block that encompasses all the steps we've covered. We'll present two main workflows: one using the traditional `NormalizeData` approach, and another using `SCTransform.` Both workflows will include calculation of mitotic scores and regression of percent.mt, with an option to regress out mitotic scores if desired.
+
+### Traditional Workflow
+
+```{r traditional_workflow, eval=FALSE}
+# Load necessary libraries
+library(Seurat)
+library(SeuratExtend)
+library(harmony)
+library(scDblFinder)
+
+# Load and merge datasets
+pbmc_3p <- Read10X("data/pbmc_ACDA/3p_ACDA/filtered_feature_bc_matrix/")
+pbmc_3p <- CreateSeuratObject(pbmc_3p, project = "pbmc_3p", min.features = 500, min.cells = 1)
+
+pbmc_5p <- Read10X("data/pbmc_ACDA/5p_ACDA/filtered_feature_bc_matrix/")
+pbmc_5p <- CreateSeuratObject(pbmc_5p, project = "pbmc_5p", min.features = 500, min.cells = 1)
+
+pbmc_merge <- merge(pbmc_3p, pbmc_5p, add.cell.ids = c("pbmc_3p","pbmc_5p"))
+pbmc_merge <- JoinLayers(pbmc_merge)
+
+# Quality control
+pbmc_merge[["percent.mt"]] <- PercentageFeatureSet(pbmc_merge, pattern = "^MT-")
+pbmc_merge <- subset(
+  pbmc_merge,
+  subset = nFeature_RNA > 1000 &
+    nFeature_RNA < 7500 &
+    percent.mt < 20
+)
+
+# Doublet removal
+sce <- as.SingleCellExperiment(pbmc_merge)
+sce <- scDblFinder(sce, samples = "orig.ident")
+pbmc_merge$scDblFinder.class <- sce$scDblFinder.class
+pbmc_merge <- subset(pbmc_merge, subset = scDblFinder.class == "singlet")
+
+# Traditional normalization and scaling
+pbmc_merge <- NormalizeData(pbmc_merge)
+pbmc_merge <- FindVariableFeatures(pbmc_merge)
+
+# Calculate cell cycle scores
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+pbmc_merge <- CellCycleScoring(pbmc_merge, s.features = s.genes, g2m.features = g2m.genes)
+
+# Scale data, regressing out percent.mt
+# To regress out mitotic score, add "S.Score" and "G2M.Score" to vars.to.regress
+pbmc_merge <- ScaleData(pbmc_merge, vars.to.regress = c("percent.mt"))
+
+# Dimension reduction and clustering
+pbmc_merge <- RunPCA(pbmc_merge)
+pbmc_merge <- RunHarmony(pbmc_merge, group.by.vars = "orig.ident")
+pbmc_merge <- RunUMAP(pbmc_merge, dims = 1:10, reduction = "harmony")
+pbmc_merge <- FindNeighbors(pbmc_merge, dims = 1:10, reduction = "harmony")
+pbmc_merge <- FindClusters(pbmc_merge, resolution = 0.5)
+
+# Visualization
+DimPlot2(pbmc_merge, features = c("seurat_clusters", "orig.ident", "CD3D", "CD14"), theme = NoAxes())
+```
+
+It's worth mentioning that `SeuratExtend` provides a convenient function called `RunBasicSeurat`. This function integrates multiple steps including cell filtering, calculating percent.mt, as well as `NormalizeData`, `FindVariableFeatures`, `ScaleData`, `RunPCA`, `RunHarmony`, `RunUMAP`, `FindNeighbors`, and `FindClusters` into a single step, making it easier to use. Here's an example of how to use it:
+
+```{r integrated_workflow, eval=FALSE}
+# Load necessary libraries
+library(Seurat)
+library(SeuratExtend)
+library(scDblFinder)
+
+# Load and merge datasets
+pbmc_3p <- Read10X("data/pbmc_ACDA/3p_ACDA/filtered_feature_bc_matrix/")
+pbmc_3p <- CreateSeuratObject(pbmc_3p, project = "pbmc_3p", min.features = 500, min.cells = 1)
+
+pbmc_5p <- Read10X("data/pbmc_ACDA/5p_ACDA/filtered_feature_bc_matrix/")
+pbmc_5p <- CreateSeuratObject(pbmc_5p, project = "pbmc_5p", min.features = 500, min.cells = 1)
+
+pbmc_merge <- merge(pbmc_3p, pbmc_5p, add.cell.ids = c("pbmc_3p","pbmc_5p"))
+pbmc_merge <- JoinLayers(pbmc_merge)
+
+# Doublet removal
+sce <- as.SingleCellExperiment(pbmc_merge)
+sce <- scDblFinder(sce, samples = "orig.ident")
+pbmc_merge$scDblFinder.class <- sce$scDblFinder.class
+pbmc_merge <- subset(pbmc_merge, subset = scDblFinder.class == "singlet")
+
+# Run the integrated workflow
+pbmc_merge <- RunBasicSeurat(
+  pbmc_merge,
+  spe = "human",
+  nFeature_RNA.min = 1000,
+  nFeature_RNA.max = 7500,
+  percent.mt.max = 20,
+  dims = 1:10,
+  resolution = 0.5,
+  vars.to.regress = "percent.mt",
+  harmony.by = "orig.ident"
+)
+
+# Visualization
+DimPlot2(pbmc_merge, features = c("seurat_clusters", "orig.ident", "CD3D", "CD14"), theme = NoAxes())
+```
+
+This approach simplifies the workflow significantly, allowing you to perform multiple analysis steps with a single function call. It's particularly useful for standard analyses or when you want to quickly process your data using default parameters.
+
+### SCTransform Workflow
+
+```{r sctransform_workflow, eval=FALSE}
+# Load necessary libraries
+library(Seurat)
+library(SeuratExtend)
+library(harmony)
+library(scDblFinder)
+
+# Load and merge datasets
+pbmc_3p <- Read10X("data/pbmc_ACDA/3p_ACDA/filtered_feature_bc_matrix/")
+pbmc_3p <- CreateSeuratObject(pbmc_3p, project = "pbmc_3p", min.features = 500, min.cells = 1)
+
+pbmc_5p <- Read10X("data/pbmc_ACDA/5p_ACDA/filtered_feature_bc_matrix/")
+pbmc_5p <- CreateSeuratObject(pbmc_5p, project = "pbmc_5p", min.features = 500, min.cells = 1)
+
+pbmc_merge <- merge(pbmc_3p, pbmc_5p, add.cell.ids = c("pbmc_3p","pbmc_5p"))
+pbmc_merge <- JoinLayers(pbmc_merge)
+
+# Quality control
+pbmc_merge[["percent.mt"]] <- PercentageFeatureSet(pbmc_merge, pattern = "^MT-")
+pbmc_merge <- subset(
+  pbmc_merge,
+  subset = nFeature_RNA > 1000 &
+    nFeature_RNA < 7500 &
+    percent.mt < 20
+)
+
+# Doublet removal
+sce <- as.SingleCellExperiment(pbmc_merge)
+sce <- scDblFinder(sce, samples = "orig.ident")
+pbmc_merge$scDblFinder.class <- sce$scDblFinder.class
+pbmc_merge <- subset(pbmc_merge, subset = scDblFinder.class == "singlet")
+
+# Calculate cell cycle scores
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+pbmc_merge <- CellCycleScoring(pbmc_merge, s.features = s.genes, g2m.features = g2m.genes)
+
+# SCTransform normalization
+# To regress out mitotic score, add "S.Score" and "G2M.Score" to vars.to.regress
+pbmc_merge <- SCTransform(pbmc_merge, vars.to.regress = c("percent.mt"))
+
+# Dimension reduction and clustering
+pbmc_merge <- RunPCA(pbmc_merge)
+pbmc_merge <- RunHarmony(pbmc_merge, group.by.vars = "orig.ident", theta = 5)
+pbmc_merge <- RunUMAP(pbmc_merge, dims = 1:20, reduction = "harmony")
+pbmc_merge <- FindNeighbors(pbmc_merge, dims = 1:20, reduction = "harmony")
+pbmc_merge <- FindClusters(pbmc_merge, resolution = 0.5)
+
+# Visualization
+DimPlot2(pbmc_merge, features = c("seurat_clusters", "orig.ident", "CD3D", "CD14"), theme = NoAxes())
+```
+
+These comprehensive workflows incorporate all the key steps we've discussed in this lesson, including data loading, quality control, doublet removal, normalization (using both traditional and `SCTransform` methods), cell cycle scoring, batch correction with Harmony, and clustering. 
+
+Remember that the choice between the traditional workflow and `SCTransform` depends on your specific dataset and research questions. It's often beneficial to try both methods and compare the results. Additionally, the decision to regress out mitotic scores should be based on your biological question and the nature of your data.
+
+By providing these complete workflows, you can easily reproduce the entire analysis process and modify it as needed for your own datasets. Happy analyzing!
