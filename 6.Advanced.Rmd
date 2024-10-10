@@ -1,0 +1,115 @@
+---
+title: "Lesson 6: Advanced scRNA-seq Analytical Methods"
+author: "Yichao Hua"
+date: "2024-10-11"
+output: html_document
+---
+
+## Introduction
+
+In this lesson, we'll explore advanced analytical methods for single-cell RNA sequencing data. These techniques provide deeper insights into cellular processes, regulatory networks, and cell-cell interactions. While some of these operations may be time-consuming and might not be performed in real-time during the class, we provide tutorials and explanations for each method to facilitate your independent exploration after the course.
+
+## SCENIC: Single-Cell Regulatory Network Inference and Clustering
+
+SCENIC (Single-Cell Regulatory Network Inference and Clustering) is a powerful computational method that provides insights into the regulatory networks governing gene expression in single cells. It identifies transcription factors (TFs), their target genes, and their activity in individual cells.
+
+### Background
+
+SCENIC was introduced in a [Nature Methods paper](https://www.nature.com/articles/nmeth.4463) and has become a valuable tool in single-cell analysis. The method consists of three main steps:
+
+1. Identification of co-expression modules using GENIE3 or GRNBoost
+2. Refinement of these modules based on enrichment of TF binding motifs (RcisTarget)
+3. Evaluation of the activity of each module in each cell (AUCell)
+
+For optimal performance, it's recommended to use the Nextflow pipeline to run SCENIC, which can be found [here](https://github.com/aertslab/SCENICprotocol/).
+
+### Importing SCENIC Results into Seurat
+
+While `SeuratExtend` doesn't currently include a `RunScenic` function, it does provide tools to import and analyze SCENIC results within the Seurat framework. Let's start by importing a pre-computed SCENIC loom file:
+
+```{r setup, message=FALSE, warning=FALSE}
+library(Seurat)
+library(SeuratExtend)
+
+# Download the pre-computed SCENIC loom file
+scenic_loom_path <- file.path(tempdir(), "pyscenic_integrated-output.loom")
+download.file("https://zenodo.org/records/10944066/files/pbmc3k_small_pyscenic_integrated-output.loom", scenic_loom_path)
+
+# Load the PBMC dataset we worked with in previous lessons
+pbmc <- readRDS("rds/pbmc_annotated.rds")
+
+# Import SCENIC results into our Seurat object
+pbmc <- ImportPyscenicLoom(scenic_loom_path, seu = pbmc)
+```
+
+### Examining SCENIC Outputs
+
+SCENIC results are stored in `seu@misc$SCENIC`. Let's take a look at some of the key components:
+
+```{r}
+# View the AUCell matrix (TF activity scores)
+tf_auc <- pbmc@misc$SCENIC$RegulonsAUC
+head(tf_auc[, 1:5])
+
+# View the list of TFs and their target genes
+tf_gene_list <- pbmc@misc$SCENIC$Regulons
+head(tf_gene_list, 3)
+```
+
+The AUCell scores represent the enrichment of target genes for each TF in each cell, indicating regulon activity.
+
+### Visualizing SCENIC Results
+
+Now that we have integrated SCENIC data into our Seurat object, we can use various visualization tools to explore these regulatory networks.
+
+#### Identifying Top Activated TFs in Each Cluster
+
+Let's create a heatmap to visualize the top activated TFs in each cluster:
+
+```{r, fig.width=6, fig.height=8, message=FALSE, warning=FALSE}
+tf_zscore <- CalcStats(tf_auc, f = pbmc$cluster, order = "p", n = 4, t = TRUE)
+Heatmap(tf_zscore, lab_fill = "zscore")
+```
+
+This heatmap shows the relative activity (z-score) of top TFs across different cell clusters. Darker colors indicate higher activity.
+
+#### Comparing TF Gene Expression Levels and Regulon Activity
+
+We can compare the expression levels of TFs with their regulon activity:
+
+```{r, fig.width=8, fig.height=6}
+DimPlot2(
+  pbmc,
+  features = c("ETS1", "ATF3", "tf_ETS1", "tf_ATF3"),
+  cols = list("tf_ETS1" = "D", "tf_ATF3" = "D")
+)
+```
+
+In these plots, "ETS1" and "ATF3" show the gene expression levels, while "tf_ETS1" and "tf_ATF3" show the regulon activity (AUCell scores).
+
+#### Comparing Regulon Activity Between Cell Types
+
+Let's create a waterfall plot to compare regulon activity between two cell types:
+
+```{r, fig.width=8, fig.height=5}
+# Set the default assay to "TF" for easier access to regulon activity
+DefaultAssay(pbmc) <- "TF"
+
+# Create a waterfall plot
+WaterfallPlot(
+  pbmc,
+  features = rownames(pbmc),  # Use all available TFs in the "TF" assay
+  ident.1 = "Mono CD14",      # First group of cells
+  ident.2 = "CD8 T cell",     # Second group of cells
+  exp.transform = FALSE,      # Disable transformation of expression data
+  top.n = 20                  # Display the top 20 most differentially active TFs
+)
+```
+
+This plot shows the differential activity of TFs between monocytes and CD8 T cells, highlighting key regulators that distinguish these cell types.
+
+### Conclusion
+
+SCENIC provides valuable insights into the regulatory networks governing gene expression in single cells. By integrating SCENIC results with Seurat, we can leverage powerful visualization tools to explore these networks in the context of our single-cell data.
+
+In the next sections, we'll explore other advanced analytical methods for single-cell RNA-seq data, including trajectory analysis, cell-cell communication, and more.
