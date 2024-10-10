@@ -1,5 +1,5 @@
 ---
-title: "Lesson 6: Advanced scRNA-seq Analytical Methods"
+title: "Lesson 6: Advanced scRNA-seq Analytical Methods (Part 1）"
 author: "Yichao Hua"
 date: "2024-10-11"
 output: html_document
@@ -13,8 +13,8 @@ This lesson will cover the following topics:
 
 1. Gene Regulatory Network Analysis: SCENIC
 2. Trajectory Analysis: scVelo and Palantir
-3. Cell-Cell Communication: CellChat and NicheNet
-4. Label Transfer: singleCellNet
+3. Label Transfer: singleCellNet
+4. Cell-Cell Communication: CellChat and NicheNet
 5. Data Imputation: MAGIC 
 6. Copy Number Variation Analysis: CopyKat
 7. TCR/BCR Analysis: scRepertoire
@@ -37,10 +37,12 @@ For optimal performance, it's recommended to use the Nextflow pipeline to run SC
 
 While `SeuratExtend` doesn't currently include a `RunScenic` function, it does provide tools to import and analyze SCENIC results within the Seurat framework. Let's start by importing a pre-computed SCENIC loom file:
 
-```{r setup, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
 library(Seurat)
 library(SeuratExtend)
+```
 
+```{r, message=FALSE, warning=FALSE}
 # Download the pre-computed SCENIC loom file
 scenic_loom_path <- file.path(tempdir(), "pyscenic_integrated-output.loom")
 download.file("https://zenodo.org/records/10944066/files/pbmc3k_small_pyscenic_integrated-output.loom", scenic_loom_path)
@@ -89,11 +91,12 @@ This heatmap shows the relative activity (z-score) of top TFs across different c
 
 We can compare the expression levels of TFs with their regulon activity:
 
-```{r, fig.width=8, fig.height=6}
+```{r, fig.width=8, fig.height=6, message=FALSE, warning=FALSE}
 DimPlot2(
   pbmc,
   features = c("ETS1", "ATF3", "tf_ETS1", "tf_ATF3"),
-  cols = list("tf_ETS1" = "D", "tf_ATF3" = "D")
+  cols = list("tf_ETS1" = "D", "tf_ATF3" = "D"),
+  theme = NoAxes()
 )
 ```
 
@@ -201,10 +204,14 @@ This step combines our Seurat object with the Velocyto output, creating an AnnDa
 
 Now that we have prepared our data, we can generate scVelo plots to visualize the predicted cell trajectories.
 
-```{r scvelo_plot, message=FALSE, warning=FALSE, eval=FALSE}
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
 # Generate basic scVelo plot
 scVelo.Plot(color = "cluster", save = "scvelo_basic.png", figsize = c(5,4))
+```
 
+![Basic scVelo Plot](scvelo_basic.png)
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
 # Generate a more customized scVelo plot
 scVelo.Plot(
   style = "scatter",
@@ -217,7 +224,6 @@ scVelo.Plot(
 )
 ```
 
-![Basic scVelo Plot](scvelo_basic.png)
 ![Customized scVelo Plot](scvelo_custom.png)
 
 These plots show the predicted trajectories of cells based on RNA velocity. The arrows indicate the likely future state of cells, providing insights into differentiation paths. In the basic plot, we can see how different cell clusters are related and the direction of their differentiation. The customized plot focuses on specific cell types (DC and Mono CD14), allowing us to examine their relationships more closely.
@@ -358,7 +364,7 @@ cellchat <- aggregateNet(cellchat)
 
 CellChat provides various functions to visualize the inferred cell-cell communication networks:
 
-```{r visualize_cellchat, fig.width=12, fig.height=8, message=FALSE, warning=FALSE}
+```{r visualize_cellchat, fig.width=8, fig.height=6, message=FALSE, warning=FALSE}
 # Visualize the overall communication network
 netVisual_circle(cellchat@net$count, vertex.weight = table(cellchat@idents), weight.scale = T, label.edge= F, title.name = "Number of interactions")
 
@@ -392,9 +398,8 @@ For this example, we'll use a dataset from a study on T cell responses in lymph 
 
 First, let's load the necessary libraries and data:
 
-```{r setup, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
 library(nichenetr)
-library(tidyverse)
 
 # Load pre-processed Seurat object
 seuratObj <- readRDS(url("https://zenodo.org/record/3531889/files/seuratObj.rds"))
@@ -450,7 +455,7 @@ These are the ligands that NicheNet predicts are most likely to be influencing g
 
 2. Ligand activity and target genes:
 
-```{r ligand_activity, fig.width = 12, fig.height = 8}
+```{r ligand_activity, fig.width = 14, fig.height = 8}
 nichenet_output$ligand_activity_target_heatmap
 ```
 
@@ -474,118 +479,8 @@ This plot shows which sender cell types are expressing the top predicted ligands
 NicheNet provides a powerful way to generate hypotheses about cell-cell communication in your single-cell data. By integrating prior knowledge about ligand-target interactions with your specific dataset, it can predict which ligands from sender cells are most likely influencing gene expression changes in receiver cells.
 
 Key points to remember when interpreting NicheNet results:
+
 1. The top-ranked ligands are predictions and should be validated experimentally.
 2. Consider both the ligand activity scores and the expression of ligands in sender cells.
 3. Look for biological coherence in the predicted target genes.
 4. These predictions can guide further experiments to understand the mechanisms of cell-cell communication in your biological system.
-
-## 4. Label Transfer with singleCellNet
-
-### Introduction to Label Transfer
-
-Label transfer is a crucial technique in single-cell RNA sequencing analysis. It allows us to use information from well-annotated datasets (reference data) to classify cells in new, unannotated datasets (query data). This is particularly useful when working with novel or poorly characterized cell populations.
-
-### singleCellNet: A Tool for Label Transfer
-
-[singleCellNet](https://github.com/pcahan1/singleCellNet) is a machine learning-based tool designed for classifying cells in single-cell RNA sequencing data. It offers robust performance across different platforms and species and provides interpretable feature importance scores.
-
-### Setting Up singleCellNet
-
-First, let's install and load the necessary libraries:
-
-```{r setup, message=FALSE, warning=FALSE}
-if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
-if (!requireNamespace("singleCellNet", quietly = TRUE)) devtools::install_github("pcahan1/singleCellNet")
-
-library(singleCellNet)
-library(Seurat)
-library(tidyverse)
-```
-
-### Preparing the Data
-
-For this example, we'll use two datasets: one as a reference (training) set and another as a query (test) set. Let's assume we have these as Seurat objects:
-
-```{r data_prep}
-# Load your reference and query Seurat objects
-# In a real scenario, you would load your data here
-reference_seurat <- pbmc
-query_seurat <- pbmc_merge
-
-# Convert Seurat objects to SingleCellExperiment objects
-sce_reference <- as.SingleCellExperiment(reference_seurat)
-sce_query <- as.SingleCellExperiment(query_seurat)
-
-# Find common genes between the two datasets
-commonGenes <- intersect(rownames(sce_reference), rownames(sce_query))
-
-# Subset both datasets to only include common genes
-sce_reference <- sce_reference[commonGenes, ]
-sce_query <- sce_query[commonGenes, ]
-```
-
-### Training the Classifier
-
-Now, let's train the singleCellNet classifier using our reference dataset:
-
-```{r train_classifier}
-# Prepare training data
-stTrain <- data.frame(
-  cell_name = rownames(colData(sce_reference)), 
-  cell_type = colData(sce_reference)$cluster
-)
-
-expTrain <- assays(sce_reference)$counts
-
-# Train the classifier
-class_info <- scn_train(
-  stTrain = stTrain, 
-  expTrain = expTrain, 
-  nTopGenes = 10, 
-  nRand = 70, 
-  nTrees = 1000, 
-  nTopGenePairs = 25, 
-  dLevel = "cell_type", 
-  colName_samp = "cell_name"
-)
-```
-
-### Classifying Cells in the Query Dataset
-
-With our trained classifier, we can now classify cells in our query dataset:
-
-```{r classify_query}
-classRes_query <- scn_predict(
-  cnProc = class_info[['cnProc']], 
-  expDat = assays(sce_query)$counts, 
-  nrand = 50
-)
-
-# Add classification results to the query Seurat object
-query_seurat$Predicted_Labels <- rownames(classRes_query)[apply(classRes_query[,colnames(query_seurat)], 2, which.max)]
-```
-
-### Visualizing the Results
-
-Let's visualize the classification results:
-
-```{r visualize_results, fig.width=7.5, fig.height=6}
-# Create a UMAP plot colored by the singleCellNet classifications
-DimPlot2(query_seurat, group.by = "Predicted_Labels", label = TRUE)
-```
-
-### Interpreting the Results
-
-This plot shows how cells in our query dataset have been classified based on the reference dataset. Each color represents a different cell type predicted by singleCellNet.
-
-Key points to consider when interpreting these results:
-1. Clusters of cells with the same classification suggest consistent cell types.
-2. Cells classified as multiple types or with low confidence scores may represent novel cell types or states not present in the reference data.
-3. The accuracy of classification depends on the quality and relevance of the reference dataset.
-
-### Conclusion
-
-singleCellNet provides a powerful method for transferring cell type labels from a reference dataset to a new query dataset. This can greatly aid in the annotation of novel single-cell RNA sequencing data, especially when dealing with complex or poorly characterized tissues.
-
-However, it's important to remember that computational predictions should always be validated with biological knowledge and, when possible, experimental validation.
-
