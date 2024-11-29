@@ -101,6 +101,9 @@ head(Embeddings(pbmc_merge, reduction = "harmony"), 3)
 VlnPlot2(pbmc_merge, features = paste0("PC_", 1:9), group.by = "orig.ident")
 VlnPlot2(pbmc_merge, features = paste0("harmony_", 1:9), group.by = "orig.ident")
 
+# Save Seurat object
+saveRDS(pbmc_merge, file = "rds/pbmc_merge.rds")
+
 # 5. Cell-Cycle Scoring and Regression
 
 # Load cell cycle genes

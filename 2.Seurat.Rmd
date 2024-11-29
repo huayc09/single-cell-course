@@ -1,13 +1,13 @@
 ---
 title: "Lesson 2: Basic Single-Cell Analysis Workflow with Seurat"
 author: "Yichao Hua"
-date: "2024-10-08"
+date: "2024-11-29"
 output: html_document
 ---
 
 ## Introduction to Single-Cell Analysis with Seurat
 
-Seurat is the most popular framework for analyzing single-cell data in R. It provides structured data storage, basic analysis workflows, and visualization solutions. Before we dive into the code, let's introduce some fundamental concepts and principles of single-cell data analysis. This background will help us better understand the process.
+[Seurat](https://satijalab.org/seurat/) is the most popular framework for analyzing single-cell data in R. It provides structured data storage, basic analysis workflows, and visualization solutions. Before we dive into the code, let's introduce some fundamental concepts and principles of single-cell data analysis. This background will help us better understand the process.
 
 ### From Raw Data to Visualization: The Single-Cell Analysis Journey
 
@@ -319,7 +319,9 @@ Finally, let's install SeuratExtend in preparation for the next lessons:
 
 ```{r, eval=FALSE}
 # If you haven't installed remotes yet:
-# install.packages("remotes")
+if (!requireNamespace("remotes", quietly = TRUE)) {
+    install.packages("remotes")
+}
 remotes::install_github("huayc09/SeuratExtend")
 ```
 

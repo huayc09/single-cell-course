@@ -1,7 +1,7 @@
 ---
 title: "Lesson 5: Core scRNA-seq Workflow Enhancements"
 author: "Yichao Hua"
-date: "2024-10-11"
+date: "2024-11-29"
 output: html_document
 ---
 
@@ -241,6 +241,12 @@ VlnPlot2(pbmc_merge, features = paste0("harmony_", 1:9), group.by = "orig.ident"
 As we can see, the PCs that were previously correlated with the `orig.ident` (i.e., showed clear differences between 3' and 5' samples) have been corrected. The Harmony-corrected PCs now primarily retain information about differences between cell types, rather than differences between sequencing techniques.
 
 This integration step is crucial when working with multiple datasets or batches, as it allows us to focus on the biological differences of interest rather than technical variations between samples or batches. However, it's important to use this technique judiciously and always consider whether the differences between your samples might be biologically relevant rather than just technical noise.
+
+Let's save the current Seurat object as an RDS file:
+
+```{r}
+saveRDS(pbmc_merge, file = "rds/pbmc_merge.rds")
+```
 
 ## 5. Cell-Cycle Scoring and Regression
 

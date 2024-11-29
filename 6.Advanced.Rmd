@@ -1,7 +1,7 @@
 ---
-title: "Lesson 6: Advanced scRNA-seq Analytical Methods (Part 1）"
+title: "Lesson 6: Advanced scRNA-seq Analytical Methods (Part 1)"
 author: "Yichao Hua"
-date: "2024-10-11"
+date: "2024-11-29"
 output: html_document
 ---
 
@@ -45,7 +45,8 @@ library(SeuratExtend)
 ```{r, message=FALSE, warning=FALSE}
 # Download the pre-computed SCENIC loom file
 scenic_loom_path <- file.path(tempdir(), "pyscenic_integrated-output.loom")
-download.file("https://zenodo.org/records/10944066/files/pbmc3k_small_pyscenic_integrated-output.loom", scenic_loom_path)
+download.file("https://zenodo.org/records/10944066/files/pbmc3k_small_pyscenic_integrated-output.loom",
+              scenic_loom_path, mode = "wb")  # Use binary mode for Windows compatibility
 
 # Use the example PBMC dataset from SeuratExtend package
 pbmc <- SeuratExtend::pbmc
@@ -160,13 +161,26 @@ If you've never used `conda` or `reticulate` before, you might need to install m
 reticulate::install_miniconda()
 ```
 
-Next, we need to create a conda environment with all the required Python packages. `SeuratExtend` provides a function to do this automatically:
+Next, we need to create a conda environment with all the required Python packages. 
+
+**Note:** Before creating the conda environment, ensure that Git is installed on your system, as it's required for installing certain Python packages:
+
+- **Windows**: Download and install from [Git for Windows](https://gitforwindows.org/)
+- **Mac**: Install via Homebrew (`brew install git`) or Xcode Command Line Tools (`xcode-select --install`)
+- **Linux**: Install using your package manager:
+  * Ubuntu/Debian: `sudo apt-get install git`
+  * Fedora: `sudo dnf install git`
+  * CentOS/RHEL: `sudo yum install git`
+
+`SeuratExtend` provides a function to do this automatically:
 
 ```{r create_conda_env, eval=FALSE}
 SeuratExtend::create_condaenv_seuratextend()
 ```
 
 This function will set up a conda environment named "seuratextend" with all the necessary Python packages. You only need to run this once, and `SeuratExtend` will automatically use this environment in future sessions.
+
+**Note:** This function automatically detects your operating system and sets up the environment accordingly. It is currently supported and tested on Windows, Intel-based macOS (not Apple Silicon/M1/M2), and Linux (Ubuntu 20.04) systems. Users with Apple Silicon devices who are interested in contributing to the development of M1/M2 support are welcome to reach out via GitHub Issues.
 
 ### scVelo: RNA Velocity-based Trajectory Analysis
 
@@ -185,10 +199,17 @@ library(SeuratExtend)
 # Download the example Seurat Object and loom file
 mye_small <- readRDS(url("https://zenodo.org/records/10944066/files/pbmc10k_mye_small_velocyto.rds", "rb"))
 loom_path <- file.path(tempdir(), "pbmc10k_mye_small.loom")
-download.file("https://zenodo.org/records/10944066/files/pbmc10k_mye_small.loom", loom_path)
+download.file("https://zenodo.org/records/10944066/files/pbmc10k_mye_small.loom", 
+              loom_path,
+              mode = "wb")  # Use binary mode for Windows compatibility
 
-# Prepare AnnData object for scVelo
-adata_path <- file.path(tempdir(), "mye_small.h5ad")
+# Set up the path for saving the AnnData object in the HDF5 (h5ad) format
+if (.Platform$OS.type == "windows") {
+    adata_path <- normalizePath(file.path(tempdir(), "mye_small.h5ad"), winslash = "/")
+} else {
+    adata_path <- file.path(tempdir(), "mye_small.h5ad")
+}
+
 scVelo.SeuratToAnndata(
   mye_small,
   filename = adata_path,
@@ -209,7 +230,7 @@ Now that we have prepared our data, we can generate scVelo plots to visualize th
 scVelo.Plot(color = "cluster", save = "scvelo_basic.png", figsize = c(5,4))
 ```
 
-![Basic scVelo Plot](scvelo_basic.png)
+![Basic scVelo Plot](figures/scvelo_scvelo_basic.png)
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE}
 # Generate a more customized scVelo plot
@@ -224,7 +245,7 @@ scVelo.Plot(
 )
 ```
 
-![Customized scVelo Plot](scvelo_custom.png)
+![Customized scVelo Plot](figures/scvelo_scvelo_custom.png)
 
 These plots show the predicted trajectories of cells based on RNA velocity. The arrows indicate the likely future state of cells, providing insights into differentiation paths. In the basic plot, we can see how different cell clusters are related and the direction of their differentiation. The customized plot focuses on specific cell types (DC and Mono CD14), allowing us to examine their relationships more closely.
 
@@ -273,8 +294,9 @@ DimPlot2(mye_small, features = colnames(ps), reduction = "ms",
 ```
 
 These plots show several important pieces of information:
+
 - **Pseudotime**: This shows the ordering of cells from the start to the end of the process.
-- **Entropy**: This represents the uncertainty in cell fate. Higher entropy (darker color) suggests that a cell has multiple potential fates.
+- **Entropy**: This represents the uncertainty in cell fate. Higher entropy (lighter color) suggests that a cell has multiple potential fates.
 - **Fate1 and Fate2**: These show the probability of cells progressing towards specific fates.
 
 ### Comparing Gene Expression Along Trajectories
@@ -455,7 +477,7 @@ These are the ligands that NicheNet predicts are most likely to be influencing g
 
 2. Ligand activity and target genes:
 
-```{r ligand_activity, fig.width = 14, fig.height = 8}
+```{r ligand_activity, fig.width = 15, fig.height = 8}
 nichenet_output$ligand_activity_target_heatmap
 ```
 

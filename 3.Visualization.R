@@ -49,6 +49,13 @@ DimPlot2(pbmc, label = TRUE, box = TRUE, label.color = "black", repel = TRUE, th
 # Simplifying labels with indices
 DimPlot2(pbmc, index.title = "C", box = TRUE, label.color = "black")
 
+# Adding UMAP Arrows
+DimPlot2(
+  pbmc, 
+  features = c("cluster", "sample", "CD14", "CD3D"),
+  theme = NoAxes()
+) + theme_umap_arrows()
+
 # 2. Simultaneous Display of Three Features on a Dimension Reduction Plot
 
 # Using RYB system
@@ -102,6 +109,15 @@ VlnPlot2(pbmc, features = genes, group.by = "cluster", cells = cells,
 VlnPlot2(pbmc, features = genes, group.by = "cluster", cells = cells, 
          stat.method = "t.test", comparisons = list(c(1,2), c(1,3)), hide.ns = FALSE)
 
+# Adding Mean and Median Lines
+lowExprGenes <- c("CCR7", "IL7R", "TCF7")
+VlnPlot2(pbmc, 
+         features = lowExprGenes, 
+         show.mean = TRUE,      # Show mean and median lines
+         mean_colors = c("red", "blue"),  # Colors for mean and median
+         cols = "light",        # Light color scheme for better visibility
+         ncol = 1)
+
 # 5. Generate a Heatmap Plot
 
 # Generate sample matrix
@@ -133,7 +149,41 @@ gene_groups <- sample(c("group1", "group2", "group3"), nrow(toplot2), replace = 
 Heatmap(toplot2, lab_fill = "zscore", facet_row = gene_groups) +
   theme(axis.text.y = element_blank())
 
-# 6. Generate a Waterfall Plot
+# 6. Create Enhanced Dot Plots
+
+# Basic Usage
+genes <- VariableFeatures(pbmc)[1:10]
+DotPlot2(pbmc, features = genes)
+
+# Grouped Features
+grouped_features <- list(
+  "B_cell_markers" = c("MS4A1", "CD79A"),
+  "T_cell_markers" = c("CD3D", "CD8A", "IL7R"),
+  "Myeloid_markers" = c("CD14", "FCGR3A", "S100A8")
+)
+DotPlot2(pbmc, features = grouped_features)
+
+# Split Visualization
+DotPlot2(pbmc, features = genes, group.by = "cluster", split.by = "orig.ident", show_grid = FALSE)
+
+# Alternative Split Visualization
+# Using colors instead of borders for split groups
+DotPlot2(pbmc, 
+         features = genes, 
+         group.by = "cluster", 
+         split.by = "orig.ident", 
+         split.by.method = "color", 
+         show_grid = FALSE)
+
+# Customizing Appearance
+DotPlot2(pbmc, 
+         features = grouped_features, 
+         color_scheme = "BuRd", 
+         border = FALSE,        # Remove dot borders
+         show_grid = FALSE,     # Remove grid lines
+         flip = TRUE)          # Flip coordinates
+
+# 7. Generate a Waterfall Plot
 
 # Basic waterfall plot
 genes <- VariableFeatures(pbmc)[1:80]
@@ -147,7 +197,26 @@ WaterfallPlot(
   ident.1 = "Mono CD14", ident.2 = "CD8 T cell", length = "logFC",
   top.n = 20)
 
-# 7. Explore Color Functions
+# 8. Create Volcano Plots
+
+# Basic Usage
+VolcanoPlot(pbmc, 
+            ident.1 = "B cell",
+            ident.2 = "CD8 T cell")
+
+# Customizing Thresholds
+VolcanoPlot(
+  pbmc,
+  ident.1 = "B cell",
+  ident.2 = "CD8 T cell",
+  x.threshold = 0.5,    # Log fold change threshold
+  y.threshold = 2     # -log10(p-value) threshold
+)
+
+# 9. Tips: Choosing the Right Visualization
+# See details in "3.Visualization.Rmd"
+
+# 10. Explore Color Functions
 
 # Discrete variables with "light" color scheme
 plot_grid(
@@ -161,7 +230,7 @@ Heatmap(toplot, lab_fill = "zscore", color_scheme = "A")
 
 # Continuous variables with "D" color scheme
 WaterfallPlot(
-  pbmc, group.by = "cluster", features = genes,
+  pbmc, group.by = "cluster", features = VariableFeatures(pbmc)[1:80],
   ident.1 = "Mono CD14", ident.2 = "CD8 T cell", length = "logFC",
   top.n = 20, color_theme = "D")
 
@@ -173,16 +242,16 @@ markers_genes <- c(
 DimPlot2(
   pbmc,
   features = markers_genes,
-  cols = brewer.pal(9, "GnBu"),
-  theme = NoAxes(), pt.size = 0.3)
+  cols = "OrRd",
+  theme = NoAxes())
 
 DimPlot2(
   pbmc,
   features = markers_genes,
-  cols = rev(brewer.pal(11,"Spectral")),
-  theme = NoAxes(), pt.size = 0.3)
+  cols = "Spectral-rev",
+  theme = NoAxes())
 
-# 8. Mastering ggplot2 for Custom Visualizations
+# 11. Mastering ggplot2 for Custom Visualizations
 
 # Extract data from the Seurat object
 umap_data <- FetchData(pbmc, vars = c("umap_1", "umap_2", "cluster", "CD3D", "sample"))

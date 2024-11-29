@@ -1,7 +1,7 @@
 ---
-title: "Lesson 6: Advanced scRNA-seq Analytical Methods (Part 2）"
+title: "Lesson 6: Advanced scRNA-seq Analytical Methods (Part 2)"
 author: "Yichao Hua"
-date: "2024-10-11"
+date: "2024-11-29"
 output: html_document
 ---
 
@@ -154,7 +154,8 @@ To see the impact of MAGIC, we can compare the original gene expression with the
 
 ```{r visualize-magic, fig.width=8, fig.height=6}
 # Compare original and MAGIC-imputed expression for CD14 and FLT3
-DimPlot2(mye_small, features = c("CD14", "magic_CD14", "FLT3", "magic_FLT3"), theme = NoAxes())
+DimPlot2(mye_small, features = c("CD14", "magic_CD14", "FLT3", "magic_FLT3"), 
+         theme = NoAxes(), cols = "A")
 ```
 
 In these plots:

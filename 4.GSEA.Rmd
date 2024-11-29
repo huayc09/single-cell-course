@@ -1,7 +1,7 @@
 ---
 title: "Lesson 4: Gene Set Enrichment Analysis and Utility Functions"
 author: "Yichao Hua"
-date: "2024-10-11"
+date: "2024-11-29"
 output: html_document
 ---
 
@@ -375,7 +375,7 @@ print(proportions)
 
 ```{r, fig.width=5, fig.height=3.2, message=FALSE, warning=FALSE}
 library(RColorBrewer)
-Heatmap(proportions, lab_fill = "Proportion of\npositive cell", color_scheme = brewer.pal(5, "OrRd"))
+Heatmap(proportions, lab_fill = "Proportion of\npositive cell", color_scheme = "OrRd")
 ```
 
 This will return a matrix where rows are features and columns are clusters, showing the proportion of cells in each cluster where the feature's expression is above the default threshold (0).
@@ -390,7 +390,7 @@ print(proportions_above_2)
 ```
 
 ```{r, fig.width=5.4, fig.height=3.2, message=FALSE, warning=FALSE}
-Heatmap(proportions_above_2, lab_fill = "Proportion of\nexpression > 2", color_scheme = brewer.pal(5, "OrRd"))
+Heatmap(proportions_above_2, lab_fill = "Proportion of\nexpression > 2", color_scheme = "OrRd")
 ```
 
 ### Targeting Specific Clusters

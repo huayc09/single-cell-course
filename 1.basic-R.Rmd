@@ -1,7 +1,7 @@
 ---
 title: "Lesson 1. Introduction to R"
 author: "Yichao Hua"
-date: "2024-10-08"
+date: "2024-11-29"
 output: html_document
 ---
 
@@ -43,20 +43,32 @@ In this course, we provide two types of files for you to use:
 2. **R Markdown files (.Rmd)**: These combine R code with formatted text, allowing you to create dynamic reports.
    - To use: Open in RStudio, write text and R code in chunks, then 'Knit' to generate a formatted output (e.g., HTML, PDF).
 
-We recommend setting your working directory to the folder containing all the course materials. You can do this in two ways:
+We recommend setting up a dedicated directory for this course where you'll store all your work and downloaded data. For consistency and organization, we suggest creating a folder named `single-cell-course` in your Documents directory, though you can choose a different location if you prefer. Here are two ways to set this up:
 
-1. Using the `setwd()` function in R:
+1. Using R code (recommended):
 ```{r, eval=FALSE}
-setwd("/path/to/your/course/folder")
-```
-   Replace "/path/to/your/course/folder" with the actual path to your downloaded course materials.
+# Create a directory called 'single-cell-course' in your Documents folder
+# You can change this path to anywhere else on your computer if you prefer
+dir.create("~/Documents/single-cell-course")
 
-2. Using RStudio's interface:
+# Tell R to use this new folder as your working directory
+# This means R will look for files and save outputs in this folder
+setwd("~/Documents/single-cell-course")
+```
+
+2. Using the manual approach with RStudio:
+   
+   First, create the course directory:
+   - Open your system's file explorer
+   - Navigate to your Documents folder
+   - Create a new folder named "single-cell-course"
+   
+   Then set it as your working directory in RStudio:
    - Go to Session > Set Working Directory > Choose Directory
-   - Navigate to and select your course folder
+   - Navigate to and select your newly created "single-cell-course" folder
    - Click 'Open'
 
-Setting your working directory ensures that R can easily find and access all the files you'll be using throughout the course.
+This directory will be your workspace throughout the course. Starting from Lesson 2, we'll download necessary data files and store them here.
 
 ## Basic R Programming
 

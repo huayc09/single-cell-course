@@ -7,7 +7,7 @@ library(SeuratExtend)
 
 # Download the pre-computed SCENIC loom file
 scenic_loom_path <- file.path(tempdir(), "pyscenic_integrated-output.loom")
-download.file("https://zenodo.org/records/10944066/files/pbmc3k_small_pyscenic_integrated-output.loom", scenic_loom_path)
+download.file("https://zenodo.org/records/10944066/files/pbmc3k_small_pyscenic_integrated-output.loom", scenic_loom_path, mode = "wb")
 
 # Use the example PBMC dataset from SeuratExtend package
 pbmc <- SeuratExtend::pbmc
@@ -60,10 +60,14 @@ library(SeuratExtend)
 # Download the example Seurat Object and loom file
 mye_small <- readRDS(url("https://zenodo.org/records/10944066/files/pbmc10k_mye_small_velocyto.rds", "rb"))
 loom_path <- file.path(tempdir(), "pbmc10k_mye_small.loom")
-download.file("https://zenodo.org/records/10944066/files/pbmc10k_mye_small.loom", loom_path)
+download.file("https://zenodo.org/records/10944066/files/pbmc10k_mye_small.loom", loom_path, mode = "wb")
 
 # Prepare AnnData object for scVelo
-adata_path <- file.path(tempdir(), "mye_small.h5ad")
+if (.Platform$OS.type == "windows") {
+  adata_path <- normalizePath(file.path(tempdir(), "mye_small.h5ad"), winslash = "/")
+} else {
+  adata_path <- file.path(tempdir(), "mye_small.h5ad")
+}
 scVelo.SeuratToAnndata(
   mye_small,
   filename = adata_path,
@@ -253,7 +257,8 @@ mye_small <- Palantir.Magic(mye_small)
 mye_small <- NormalizeData(mye_small)
 
 # Visualize the effects of MAGIC
-DimPlot2(mye_small, features = c("CD14", "magic_CD14", "FLT3", "magic_FLT3"), theme = NoAxes())
+DimPlot2(mye_small, features = c("CD14", "magic_CD14", "FLT3", "magic_FLT3"), 
+         theme = NoAxes(), cols = "A")
 
 # 6. Copy Number Variation Analysis: CopyKat
 

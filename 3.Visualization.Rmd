@@ -1,7 +1,7 @@
 ---
 title: "Lesson 3: Advanced Visualization Techniques"
 author: "Yichao Hua"
-date: "2024-10-08"
+date: "2024-11-29"
 output: html_document
 ---
 
@@ -99,6 +99,19 @@ DimPlot2(pbmc, index.title = "C", box = TRUE, label.color = "black")
 
 This approach ensures that the plot remains legible and aesthetically pleasing, even when dealing with numerous or complex labels.
 
+### Adding UMAP Arrows
+
+Starting from v1.1.0, you can add simplified axis indicators to your dimension reduction plots using the `theme_umap_arrows` function. This is particularly useful for UMAP or t-SNE plots where traditional axes are often removed to reduce visual clutter:
+
+```{r, fig.width=9, fig.height=6, message=FALSE, warning=FALSE}
+# Add simplified axis indicators
+DimPlot2(
+  pbmc, 
+  features = c("cluster", "sample", "CD14", "CD3D"),
+  theme = NoAxes()
+) + theme_umap_arrows()
+```
+
 ## 2. Simultaneous Display of Three Features on a Dimension Reduction Plot
 
 In `SeuratExtend`, a unique visualization method allows for the simultaneous display of three features on the same dimension reduction plot. The functions `FeaturePlot3` and `FeaturePlot3.grid` employ a color mixing system (either RYB or RGB) to represent three different genes (or other continuous variables). This method uses the principles of color mixing to quantitatively display the expression levels or intensities of these three features in each cell.
@@ -191,11 +204,9 @@ print(data_matrix)
 
 While DimPlot uses color gradients to represent expression levels, violin plots offer a more quantitative view of expression distribution. The enhanced `VlnPlot2` function in SeuratExtend integrates functionalities to superimpose boxplots, easily add statistical annotations, and offers greater flexibility in plot presentation compared to the original `VlnPlot` in Seurat.
 
-### Usage
-
 The method to employ `VlnPlot2` will differ depending on whether you're using a Seurat object or a matrix. In this lesson, we'll focus on using a Seurat object.
 
-#### Basic Violin Plot with Box Plot and Points
+### Basic Violin Plot with Box Plot and Points
 
 Let's start by selecting the genes we want to analyze. Here's an example using three genes:
 
@@ -204,37 +215,51 @@ genes <- c("CD3D", "CD14", "CD79A")
 VlnPlot2(pbmc, features = genes, ncol = 1)
 ```
 
-#### Hide Points and Outliers for a Cleaner Appearance
+### Hide Points and Outliers for a Cleaner Appearance
 
 ```{r, message=FALSE, warning=FALSE, fig.width=5, fig.height=6}
 VlnPlot2(pbmc, features = genes, pt = FALSE, hide.outlier = TRUE, ncol = 1)
 ```
 
-#### Grouping by Cluster and Splitting Each Cluster by Samples
+### Grouping by Cluster and Splitting Each Cluster by Samples
 
 ```{r, message=FALSE, warning=FALSE, fig.width=9, fig.height=7}
 VlnPlot2(pbmc, features = genes, group.by = "cluster", split.by = "sample")
 ```
 
-#### Filtering for Certain Subtypes and Arranging Plots in Columns
+### Filtering for Certain Subtypes and Arranging Plots in Columns
 
 ```{r, message=FALSE, warning=FALSE, fig.width=6, fig.height=3}
 cells <- colnames(pbmc)[pbmc$cluster %in% c("B cell", "Mono CD14", "CD8 T cell")]
 VlnPlot2(pbmc, features = genes, group.by = "cluster", cells = cells)
 ```
 
-#### Adding Statistical Annotations Using the Wilcoxon Test
+### Adding Statistical Annotations Using the Wilcoxon Test
 
 ```{r, message=FALSE, warning=FALSE, fig.width=6, fig.height=3.5}
 VlnPlot2(pbmc, features = genes, group.by = "cluster", cells = cells, 
          stat.method = "wilcox.test", hide.ns = TRUE)
 ```
 
-#### Restricting Statistical Comparisons and Using t-test
+### Restricting Statistical Comparisons and Using t-test
 
 ```{r, message=FALSE, warning=FALSE, fig.width=6, fig.height=4}
 VlnPlot2(pbmc, features = genes, group.by = "cluster", cells = cells, 
          stat.method = "t.test", comparisons = list(c(1,2), c(1,3)), hide.ns = FALSE)
+```
+
+### Adding Mean and Median Lines
+
+For genes with low expression where boxplot might be hard to interpret (e.g., when median and quartiles overlap at zero), you can add mean/median lines for better visualization:
+
+```{r, message=FALSE, warning=FALSE, fig.width=6, fig.height=6.5}
+lowExprGenes <- c("CCR7", "IL7R", "TCF7")
+VlnPlot2(pbmc, 
+         features = lowExprGenes, 
+         show.mean = TRUE,      # Show mean and median lines
+         mean_colors = c("red", "blue"),  # Colors for mean and median
+         cols = "light",        # Light color scheme for better visibility
+         ncol = 1)
 ```
 
 ## 5. Generate a Heatmap Plot
@@ -305,7 +330,78 @@ Heatmap(toplot2, lab_fill = "zscore", facet_row = gene_groups) +
   theme(axis.text.y = element_blank())
 ```
 
-## 6. Generate a Waterfall Plot
+## 6. Create Enhanced Dot Plots
+
+### Introduction
+
+While heatmaps are excellent for visualizing overall patterns, dot plots offer a complementary visualization that combines two key pieces of information:
+1. The percentage of cells expressing each feature (represented by dot size)
+2. The average expression level in expressing cells (represented by color intensity)
+
+This dual representation can provide more detailed insights than a standard heatmap, particularly when expression patterns vary between cell populations.
+
+### Basic Usage
+
+Let's create a basic dot plot for some variable features:
+
+```{r, message=FALSE, warning=FALSE, fig.width=6, fig.height=4.5}
+# Select some variable features
+genes <- VariableFeatures(pbmc)[1:10]
+DotPlot2(pbmc, features = genes)
+```
+
+### Grouped Features
+
+You can organize features into groups for clearer visualization:
+
+```{r, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=5}
+# Create grouped features
+grouped_features <- list(
+  "B_cell_markers" = c("MS4A1", "CD79A"),
+  "T_cell_markers" = c("CD3D", "CD8A", "IL7R"),
+  "Myeloid_markers" = c("CD14", "FCGR3A", "S100A8")
+)
+
+DotPlot2(pbmc, features = grouped_features)
+```
+
+### Split Visualization
+
+You can split the visualization by a metadata column to compare expression patterns across different conditions:
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=5.5}
+# Basic split visualization
+DotPlot2(pbmc, features = genes, group.by = "cluster", split.by = "orig.ident", show_grid = FALSE)
+```
+
+### Alternative Split Visualization
+
+The split groups can be represented either by border colors (default) or by dot colors:
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=5}
+# Using colors instead of borders for split groups
+DotPlot2(pbmc, 
+         features = genes, 
+         group.by = "cluster", 
+         split.by = "orig.ident", 
+         split.by.method = "color", 
+         show_grid = FALSE)
+```
+
+### Customizing Appearance
+
+You can customize various aspects of the plot, including color schemes, dot sizes, and grid lines:
+
+```{r, message=FALSE, warning=FALSE, fig.width=7, fig.height=5}
+DotPlot2(pbmc, 
+         features = grouped_features, 
+         color_scheme = "BuRd", 
+         border = FALSE,        # Remove dot borders
+         show_grid = FALSE,     # Remove grid lines
+         flip = TRUE)          # Flip coordinates
+```
+
+## 7. Generate a Waterfall Plot
 
 ### Introduction
 
@@ -333,40 +429,92 @@ WaterfallPlot(
 
 Additionally, you can set parameters to modify the plot, such as filtering features based on a specific threshold, rotating the plot 90 degrees (by setting `flip`), and more. For detailed options, refer to the function's help documentation.
 
-### Tips: Comparing Heatmaps, Violin Plots, and Waterfall Plots
+## 8. Create Volcano Plots
 
-When choosing between heatmaps, violin plots, and waterfall plots, consider the following:
+### Introduction
 
-1. Heatmaps: 
-   - Advantage: Can compare multiple groups and a large number of features.
-   - Limitation: Uses color to represent average expression levels, which may lack precision.
+The Volcano plot is a specialized variation of the scatter plot that combines statistical significance (-log10 p-value) with magnitude of change (typically log fold change). While Waterfall plots focus on ordered visualization of differences, Volcano plots provide a comprehensive view of both the magnitude and statistical significance of changes.
 
-2. Violin Plots: 
-   - Advantage: Can display multiple groups and quantitatively show expression levels.
-   - Limitation: Takes up more space, limiting the number of features that can be shown compared to heatmaps.
+### Basic Usage
 
-3. Waterfall Plots: 
-   - Advantage: Can display a large number of features.
-   - Limitation: Focuses on comparison between only two groups.
+Create a basic volcano plot comparing two cell types:
 
-## 7. Explore Color Functions
+```{r, message=FALSE, warning=FALSE, fig.width=5, fig.height=5}
+VolcanoPlot(pbmc, 
+            ident.1 = "B cell",
+            ident.2 = "CD8 T cell")
+```
 
-SeuratExtend provides various color themes to choose from. You can adjust color-related parameters (such as `cols` or `col_theme`) in visualization functions like `DimPlot2`, `VlnPlot2`, `Heatmap`, and `WaterfallPlot`. For more detailed information, refer to the online tutorial: https://huayc09.github.io/SeuratExtend/articles/Visualization.html#explore-color-functions 
+### Customizing Thresholds
 
-Here are some recommended color schemes for visualization:
+You can set custom thresholds for both axes:
 
-For discrete variables, SeuratExtend's "light" color scheme:
+```{r, message=FALSE, warning=FALSE, fig.width=5, fig.height=5}
+VolcanoPlot(
+  pbmc,
+  ident.1 = "B cell",
+  ident.2 = "CD8 T cell",
+  x.threshold = 0.5,    # Log fold change threshold
+  y.threshold = 2     # -log10(p-value) threshold
+)
+```
+
+## 9. Tips: Choosing the Right Visualization
+
+When visualizing gene expression or pathway activity data, different plot types serve different purposes. Here's a guide to help you choose:
+
+1. Overview Visualizations:
+   - **Heatmaps**:
+     * Best for: Comparing many features across multiple groups using color intensity
+     * Advantage: Compact visualization of large-scale patterns
+     * Limitation: Color intensity alone may not show detailed expression patterns
+   - **Dot Plots**:
+     * Best for: Similar to heatmaps but with additional information
+     * Advantage: Shows both expression level (color) and percent expressing cells (size)
+     * Limitation: Takes more space than heatmaps
+
+2. Two-Group Comparisons:
+   - **Waterfall Plots**:
+     * Best for: Ordered visualization of differences between two groups
+     * Advantage: Clear ranking of most differential features
+     * Limitation: Limited to two-group comparisons
+   - **Volcano Plots**:
+     * Best for: Combining fold change with statistical significance
+     * Advantage: Shows both effect size and significance
+     * Limitation: Also limited to two-group comparisons
+
+3. Detailed Expression Analysis:
+   - **Violin Plots**:
+     * Best for: Detailed view of expression distribution
+     * Advantage: Shows full distribution shape and statistical comparisons
+     * Limitation: Space-intensive, limiting the number of features that can be shown
+
+## 10. Explore Color Functions
+
+The `SeuratExtend` package provides comprehensive color management across all visualization functions. Each function type handles colors slightly differently depending on whether it's dealing with discrete or continuous variables.
+
+For more detailed information, refer to the online tutorial: https://huayc09.github.io/SeuratExtend/articles/Visualization.html#explore-color-functions 
+
+### Recommended Color Schemes
+
+Here are some recommended color schemes for different visualization needs in single-cell analysis:
+
+#### For Discrete Variables (e.g., clusters, conditions)
+
+The "light" color scheme from SeuratExtend's `color_pro` is particularly effective for labeled visualizations:
 
 ```{r, fig.width=7.5, fig.height=4, message=FALSE, warning=FALSE}
 library(cowplot)
 plot_grid(
   DimPlot2(pbmc, cols = "light", theme = NoAxes() + NoLegend()),
-  ClusterDistrBar(pbmc$sample, pbmc$cluster, cols = "light", flip = FALSE, border = "black", reverse_order = FALSE) +
+  ClusterDistrBar(pbmc$orig.ident, pbmc$cluster, cols = "light", flip = FALSE, border = "black") +
     theme(axis.title.x = element_blank())
 )
 ```
 
-For continuous variables, the "A" or "D" color schemes from viridis:
+#### For Continuous Variables (e.g., gene expression)
+
+the "A" or "D" color schemes from viridis:
 
 ```{r, message=FALSE, warning=FALSE, fig.width=5, fig.height=6.5}
 Heatmap(toplot, lab_fill = "zscore", color_scheme = "A")
@@ -374,7 +522,7 @@ Heatmap(toplot, lab_fill = "zscore", color_scheme = "A")
 
 ```{r, fig.width=7, fig.height=4}
 WaterfallPlot(
-  pbmc, group.by = "cluster", features = genes,
+  pbmc, group.by = "cluster", features = VariableFeatures(pbmc)[1:80],
   ident.1 = "Mono CD14", ident.2 = "CD8 T cell", length = "logFC",
   top.n = 20, color_theme = "D")
 ```
@@ -390,21 +538,19 @@ markers_genes <- c(
 DimPlot2(
   pbmc,
   features = markers_genes,
-  cols = brewer.pal(9, "GnBu"),
-  theme = NoAxes(), pt.size = 0.3)
+  cols = "OrRd",
+  theme = NoAxes())
 ```
 
 ```{r, fig.width=8, fig.height=7, message=FALSE, warning=FALSE}
 DimPlot2(
   pbmc,
   features = markers_genes,
-  cols = rev(brewer.pal(11,"Spectral")),
-  theme = NoAxes(), pt.size = 0.3)
+  cols = "Spectral-rev",
+  theme = NoAxes())
 ```
 
-`SeuratExtend` will soon be updated to include more built-in color schemes for selection. Stay tuned for these exciting additions!
-
-## 8. Mastering ggplot2 for Custom Visualizations
+## 11. Mastering ggplot2 for Custom Visualizations
 
 ### Introduction to ggplot2
 

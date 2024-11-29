@@ -136,13 +136,13 @@ proportions <- feature_percent(pbmc, feature = genes)
 print(proportions)
 
 library(RColorBrewer)
-Heatmap(proportions, lab_fill = "Proportion of\npositive cell", color_scheme = brewer.pal(5, "OrRd"))
+Heatmap(proportions, lab_fill = "Proportion of\npositive cell", color_scheme = "OrRd")
 
 # Adjusting the Expression Threshold
 proportions_above_2 <- feature_percent(pbmc, feature = genes, above = 2)
 print(proportions_above_2)
 
-Heatmap(proportions_above_2, lab_fill = "Proportion of\nexpression > 2", color_scheme = brewer.pal(5, "OrRd"))
+Heatmap(proportions_above_2, lab_fill = "Proportion of\nexpression > 2", color_scheme = "OrRd")
 
 # Targeting Specific Clusters
 proportions_subset <- feature_percent(pbmc, feature = genes, ident = c("B cell", "CD8 T cell"))
