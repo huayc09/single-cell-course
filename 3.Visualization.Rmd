@@ -9,6 +9,14 @@ output: html_document
 
 In our previous lesson, we created a PBMC object, completed clustering, and performed annotation. This serves as the foundation for all our subsequent analyses. In this lesson, we'll systematically explore various visualization techniques using SeuratExtend to create high-quality, publication-ready figures.
 
+First, let's set your working directory to where we'll store all course materials. If you followed Lesson 1, this would be:
+
+```{r, eval=FALSE}
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+```
+
 Let's start by loading the necessary packages and our previously saved PBMC object:
 
 ```{r setup, message=FALSE, warning=FALSE}

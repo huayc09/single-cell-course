@@ -105,7 +105,26 @@ library(Seurat)
 
 ### 2. Load the Data
 
-We'll be using a pre-downloaded 10x Genomics dataset of 3k PBMCs (Peripheral Blood Mononuclear Cells). You can download this dataset from [this link](https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz). The data should be in a folder named "data/pbmc3k/filtered_gene_bc_matrices/".
+First, let's set your working directory to where we'll store all course materials. If you followed Lesson 1, this would be:
+```{r, eval=FALSE}
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+```
+
+Now let's download and extract the course data:
+```{r, eval=FALSE}
+# Download the course data (this may take a few minutes depending on your internet connection)
+download.file(
+  "https://zenodo.org/records/14245429/files/single-cell-course-data.zip",
+  destfile = "course_data.zip"
+)
+
+# Extract the downloaded zip file
+unzip("course_data.zip", exdir = "data")
+```
+
+We'll be using a pre-downloaded 10x Genomics dataset of 3k PBMCs (Peripheral Blood Mononuclear Cells). The original dataset is available from [this link](https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz). The data should now be in a folder named "data/pbmc3k/filtered_gene_bc_matrices/".
 
 This is a typical format for a gene count matrix from 10X CellRanger output. It includes three files: barcodes, genes/features, and matrix. We'll use Seurat's `Read10X` function to read this information into R:
 

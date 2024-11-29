@@ -40,7 +40,15 @@ The `SeuratExtend` package integrates both the GO and Reactome databases, stream
 
 ### Setting Up the Environment
 
-First, let's load the necessary libraries and our previously saved PBMC object:
+First, let's set your working directory to where we'll store all course materials. If you followed Lesson 1, this would be:
+
+```{r, eval=FALSE}
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+```
+
+Load the necessary libraries and our previously saved PBMC object:
 
 ```{r, message=FALSE, warning=FALSE}
 library(Seurat)

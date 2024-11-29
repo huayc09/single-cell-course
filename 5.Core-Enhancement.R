@@ -4,6 +4,10 @@
 library(Seurat)
 library(SeuratExtend)
 
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+
 # 1. Merging Multiple Datasets
 
 # Load 3' dataset

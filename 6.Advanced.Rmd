@@ -19,6 +19,14 @@ This lesson will cover the following topics:
 6. Copy Number Variation Analysis: CopyKat
 7. TCR/BCR Analysis: scRepertoire
 
+First, let's set your working directory to where we'll store all course materials. If you followed Lesson 1, this would be:
+
+```{r, eval=FALSE}
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+```
+
 ## 1. SCENIC: Single-Cell Regulatory Network Inference and Clustering
 
 SCENIC (Single-Cell Regulatory Network Inference and Clustering) is a powerful computational method that provides insights into the regulatory networks governing gene expression in single cells. It identifies transcription factors (TFs), their target genes, and their activity in individual cells.

@@ -24,7 +24,15 @@ In real-world scenarios, we often need to analyze multiple datasets together. Th
 
 For this exercise, we'll use public datasets from the 10X Genomics website. These datasets are from the same sample but were processed using different technologies: the 3' kit and the 5' kit. These two approaches capture genes differently, which can lead to some variation in the results.
 
-First, let's load the necessary libraries and read in our data:
+First, let's set your working directory to where we'll store all course materials. If you followed Lesson 1, this would be:
+
+```{r, eval=FALSE}
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+```
+
+Load the necessary libraries and read in our data:
 
 ```{r, message=FALSE, warning=FALSE}
 library(Seurat)

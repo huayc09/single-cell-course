@@ -42,6 +42,8 @@ In this course, we provide two types of files for you to use:
 1. **R files (.R)**: These are plain text files containing R code. They're ideal for writing and running scripts.
 2. **R Markdown files (.Rmd)**: These combine R code with formatted text, allowing you to create dynamic reports.
    - To use: Open in RStudio, write text and R code in chunks, then 'Knit' to generate a formatted output (e.g., HTML, PDF).
+   
+You can download all course files from: https://github.com/huayc09/single-cell-course
 
 We recommend setting up a dedicated directory for this course where you'll store all your work and downloaded data. For consistency and organization, we suggest creating a folder named `single-cell-course` in your Documents directory, though you can choose a different location if you prefer. Here are two ways to set this up:
 

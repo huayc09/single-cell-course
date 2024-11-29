@@ -6,6 +6,10 @@ library(SeuratExtend)
 library(dplyr)
 options(max.print = 15, spe = "human")
 
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+
 # Load the PBMC object we saved at the end of Lesson 2
 pbmc <- readRDS("rds/pbmc_annotated.rds")
 

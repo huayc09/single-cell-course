@@ -9,10 +9,21 @@
 library(Seurat)
 
 # 2. Load the Data
-# We're using a pre-downloaded 10x Genomics dataset of 3k PBMCs
-# Originally download from: https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz
-# Data should be in a folder named "data/pbmc3k/filtered_gene_bc_matrices/"
 
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+
+# Download the course data (this may take a few minutes depending on your internet connection)
+download.file(
+  "https://zenodo.org/records/14245429/files/single-cell-course-data.zip",
+  destfile = "course_data.zip"
+)
+
+# Extract the downloaded zip file
+unzip("course_data.zip", exdir = "data")
+
+# Using a 10x Genomics dataset of 3k PBMCs
 raw_matrix <- Read10X("data/pbmc3k/filtered_gene_bc_matrices/")
 raw_matrix[101:120,1:20]  # View a portion of the raw count matrix
 

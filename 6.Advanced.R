@@ -1,5 +1,9 @@
 # Lesson 6: Advanced scRNA-seq Analytical Methods
 
+# Set working directory to the course folder created in Lesson 1
+# If you used a different location, replace this path with your chosen directory
+setwd("~/Documents/single-cell-course")
+
 # 1. SCENIC: Single-Cell Regulatory Network Inference and Clustering
 
 library(Seurat)
